@@ -1,0 +1,34 @@
+#!/usr/bin/env sh
+# .githooks/commit-msg
+#
+# Reference implementation of the semantic-commit-conventions skill's
+# local enforcement layer: rejects a commit at creation time if its
+# first line doesn't follow Conventional Commits format. This runs
+# before the commit exists at all -- the first line of defense, ahead
+# of .github/workflows/lint-pr-title.yml's CI-level backstop.
+#
+# Install once per clone (repo-tracked hooks, no extra tooling needed):
+#   git config core.hooksPath .githooks
+
+commit_msg_file="$1"
+commit_source="$2"
+
+# Merge commits ("Merge branch/PR ...") don't follow -- and shouldn't
+# have to follow -- this format; only validate real authored commits.
+if [ "$commit_source" = "merge" ]; then
+  exit 0
+fi
+
+first_line=$(head -n1 "$commit_msg_file")
+pattern='^(feat|fix|perf|docs|style|refactor|test|build|ci|chore|revert)(\([a-zA-Z0-9_./-]+\))?!?: .+'
+
+if ! echo "$first_line" | grep -qE "$pattern"; then
+  echo "commit-msg hook: commit message does not follow Conventional Commits format." >&2
+  echo "  Expected: <type>(<scope>)!: <description>" >&2
+  echo "  type one of: feat|fix|perf|docs|style|refactor|test|build|ci|chore|revert" >&2
+  echo "  Got: $first_line" >&2
+  echo "See .claude/skills/semantic-commit-conventions for details." >&2
+  exit 1
+fi
+
+exit 0

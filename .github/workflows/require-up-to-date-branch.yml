@@ -1,0 +1,30 @@
+# Reference implementation of the devflow-repo-model skill's "no partial
+# merges" rule: a PR's branch must contain the full current history of
+# its target branch before it's allowed to merge, even if an earlier CI
+# run against an older base was green. This repo has no staging/release
+# branches (not independently deployed), so only main is covered.
+
+name: Require up-to-date branch
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  up-to-date:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Verify branch includes latest ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+          git fetch origin "${{ github.base_ref }}"
+          if ! git merge-base --is-ancestor "origin/${{ github.base_ref }}" HEAD; then
+            echo "::error::This branch does not contain the latest origin/${{ github.base_ref }}. Merge or rebase ${{ github.base_ref }} into this branch and re-run CI before merging -- partial/stale-base merges are not allowed (see .claude/skills/devflow-repo-model)."
+            exit 1
+          fi
+          echo "Branch is up to date with origin/${{ github.base_ref }}."
