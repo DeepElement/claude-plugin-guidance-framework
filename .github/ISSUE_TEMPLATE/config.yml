@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Report a security vulnerability
-    url: https://github.com/DeepElement/claude-plugin-guidance-marketplace/security/advisories/new
+    url: https://github.com/DeepElement/claude-plugin-guidance-framework/security/advisories/new
     about: Please do not file security issues publicly — use private vulnerability reporting instead. See SECURITY.md.

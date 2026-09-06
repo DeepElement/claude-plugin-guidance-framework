@@ -53,7 +53,7 @@ of confusingly.
 Run these from inside your marketplace project:
 
 ```
-/plugin marketplace add DeepElement/claude-plugin-guidance-marketplace
+/plugin marketplace add DeepElement/claude-plugin-guidance-framework
 /plugin install guidance-conventions@claude-plugin-guidance
 /plugin install guidance-activation-check@claude-plugin-guidance
 ```
@@ -91,7 +91,7 @@ conventions your plugin needs to follow.
 Apache 2.0, with an added requirement: any public use of this project
 ("claude-plugin-guidance") or a derivative must visibly credit
 "DeepElement" and link back to its source repository,
-[DeepElement/claude-plugin-guidance-marketplace](https://github.com/DeepElement/claude-plugin-guidance-marketplace).
+[DeepElement/claude-plugin-guidance-framework](https://github.com/DeepElement/claude-plugin-guidance-framework).
 See [LICENSE](./LICENSE) for the exact terms.
 
 ## Acknowledgments
