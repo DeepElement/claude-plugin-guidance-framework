@@ -338,12 +338,6 @@ guidance defines for a workspace's use of a concept; anything else a
 workspace overrides or defines locally is outside what guidance validates
 (§10).
 
-**Status.** The `guidance-activation-check` skill in this repository still
-compares names literally and does not yet resolve qualified names or read
-`.claude/skills/realize-*/`; the resolution rules in this section, §2 and
-§10 are the pattern's, and that skill is updated separately to implement
-them.
-
 ### 4. A concept may be published with no realization at all
 
 A concept plugin is not required to ship a realization to be a valid,
@@ -461,7 +455,9 @@ finding.
 
 A dedicated plugin, `guidance-activation-check`, provides a shared skill
 that any Tier 3 realization's instructions invoke first, before doing
-real work. It:
+real work, passing the concept, the realization's own name and its own
+skill directory. A caller that passes names only still works, without the
+contract-version gate or the no-entry fallback. The skill:
 
 1. Reads `marketplace-plugin-settings.yml` for the concept in question.
 2. Confirms which realization applies and that it matches the
@@ -469,9 +465,11 @@ real work. It:
    no entry for the concept, the defining marketplace's default (see "No
    entry for the concept"). This catches a stale selection after an
    update to the defining marketplace renames or removes a realization.
-3. Validates the `config` block against the active realization's
+3. Checks that the installed Tier 2 `contractVersion` satisfies the range
+   the realization declares in its `realizes` block (§10, "Version axes").
+4. Validates the `config` block against the active realization's
    `schema.json` (§3, §7), reporting specific missing/invalid fields.
-4. If anything fails, halts with a clear, actionable message (what's
+5. If anything fails, halts with a clear, actionable message (what's
    missing, which file to edit, which schema to satisfy) **instead of**
    letting the realization proceed and fail deeper or silently
    misbehave.
@@ -514,14 +512,15 @@ realization runs should select it.
   realization name. It shows consistency, not authenticity.
 - It does not gate a skill that merely references a concept (§5). Only a
   realization's own first instruction runs it.
+- It cannot always find a workspace's realizations from a linked git
+  worktree that has no `.claude/skills` of its own, because Claude Code
+  then loads the main checkout's skills. It compares directories after
+  resolving real paths, and labels a result **BEST-EFFORT** when the
+  workspace root and the caller's directory differ.
 
-**Status.** The `guidance-activation-check` skill in this repository today
-halts when there is no entry (it does not fall back to the default) and
-reads the matched realization's `skills/realize-<provider>/schema.json`; the
-no-entry rules and the workspace location of §2 are the pattern's and the
-skill is updated separately to match. It also does not yet compare
-`contractVersion` (§10, "Version axes"): until it does, a realization's
-declared range is not enforced at run time.
+The skill needs Claude Code v2.1.196 or later, the version that
+substitutes `${CLAUDE_PROJECT_DIR}` in a skill
+([substitutions](https://code.claude.com/docs/en/skills#available-string-substitutions)).
 
 ### 7. Best practices per tier
 
