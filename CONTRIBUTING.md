@@ -1,10 +1,12 @@
 # Contributing
 
 Thanks for considering a contribution to `claude-plugin-guidance`. This
-repo is an authoring layer for people building their own Claude Code
-plugin marketplaces — see the [README](./README.md) for what it is, and
-[docs/architecture.md](./docs/architecture.md) for the concept/realization
-pattern referenced throughout this guide.
+repo is the guidance marketplace — an authoring toolkit for marketplace
+authors building their own Claude Code plugin marketplaces. See the
+[README](./README.md) for what it is, and
+[docs/architecture.md](./docs/architecture.md) for the four role names
+used here and the concept/realization pattern referenced throughout this
+guide.
 
 ## Before you start
 
@@ -35,12 +37,12 @@ review). To contribute:
 Keep PRs focused — one plugin, one doc change, or one fix per PR, rather
 than bundling unrelated changes together.
 
-## Conventions for this marketplace
+## Conventions for the guidance marketplace
 
 Every plugin here follows a small set of conventions, checked by the
 `guidance-conventions` plugin's `validate-marketplace` skill:
 
-- Plugin names are prefixed `guidance-<name>`, matching this
+- Plugin names are prefixed `guidance-<name>`, matching the guidance
   marketplace's own name.
 - Every plugin has a `.claude-plugin/plugin.json` per the
   [official plugin reference](https://code.claude.com/docs/en/plugins-reference).
@@ -54,6 +56,15 @@ Every plugin here follows a small set of conventions, checked by the
 If you have `guidance-conventions` installed, ask Claude to run
 `validate-marketplace` against your change before opening a PR.
 
+## Naming the roles
+
+Use the role names defined in
+[docs/architecture.md](./docs/architecture.md#the-four-roles): guidance
+marketplace, published marketplace, realization marketplace, and
+consuming workspace. "Tier" is reserved for Tier 1/2/3 inside one concept
+plugin; never use "tier", "level" or "layer" for a role or for a
+relationship between roles.
+
 ## Adding a plugin
 
 1. Create `plugins/guidance-<name>/.claude-plugin/plugin.json` following
@@ -66,8 +77,8 @@ If you have `guidance-conventions` installed, ask Claude to run
 ### If your plugin represents a swappable capability
 
 If what you're building has more than one reasonable implementation
-(e.g. it wraps a provider, a service, or a technology that a consumer
-might want to swap out), it should follow the concept/realization
+(e.g. it wraps a provider, a service, or a technology that a consuming
+workspace might want to swap out), it should follow the concept/realization
 pattern described in full in
 [docs/architecture.md](./docs/architecture.md). In short:
 

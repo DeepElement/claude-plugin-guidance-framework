@@ -1,11 +1,29 @@
-# How this marketplace works
+# How the guidance marketplace works
 
 This document explains the strategy behind `claude-plugin-guidance` in
 plain terms: what problem it solves, how the pieces fit together, and
-what a workspace actually gets by adopting it. For the base Claude Code
-plugin/marketplace standard this builds on, see the official docs linked
-from the [README](../README.md) — this document does not restate that
-standard.
+what a consuming workspace actually gets from a marketplace built this
+way. For the base Claude Code plugin/marketplace standard this builds
+on, see the official docs linked from the [README](../README.md) — this
+document does not restate that standard.
+
+## The four roles
+
+Four roles come up throughout these docs, each named by what it does. A
+repo plays a role relative to what it publishes or uses, so one repo can
+play more than one — a marketplace that also uses its own plugins is both
+a published marketplace and a consuming workspace.
+
+| Role | What it is |
+|---|---|
+| **guidance marketplace** | `claude-plugin-guidance` itself (`DeepElement/claude-plugin-guidance-framework`): authoring tooling for marketplace authors (`guidance-conventions`, `guidance-activation-check`). It ships no concept plugins. |
+| **published marketplace** | A marketplace authored with the guidance marketplace that publishes concept plugins (§1). Each concept plugin makes its marketplace that concept's **defining marketplace**. |
+| **realization marketplace** | A marketplace that offers realizations for concepts owned by an existing published marketplace. |
+| **consuming workspace** | The workspace (repo, project, or control plane) that registers and uses marketplaces, selects and configures realizations in `marketplace-plugin-settings.yml` (§3), and may author realizations of its own (§2). |
+
+Bare "workspace" in these docs means a consuming workspace. "Tier" is
+reserved for Tier 1/2/3, the three parts inside one concept plugin (§1);
+it never names a role or a relationship between roles.
 
 ## The problem
 
@@ -17,28 +35,32 @@ grows:
 1. **Duplication.** Every provider-specific plugin re-explains the same
    underlying concept ("send a notification," "fetch a secret") in its
    own words, with its own conventions, its own quality bar.
-2. **Lock-in by convenience.** A workspace picks whichever provider
-   plugin they installed first. Nothing in the plugin's own instructions
-   distinguishes "what this concept does" from "how this one provider
-   happens to do it" — so other skills that need the concept end up
-   coupled to that one provider's plugin by name, and switching
-   providers means rewriting every caller.
+2. **Lock-in by convenience.** A consuming workspace picks whichever
+   provider plugin it installed first. Nothing in the plugin's own
+   instructions distinguishes "what this concept does" from "how this
+   one provider happens to do it" — so other skills that need the
+   concept end up coupled to that one provider's plugin by name, and
+   switching providers means rewriting every caller.
 
-This marketplace is organized to avoid both, by treating **the concept**
-— not the provider — as the unit of distribution.
+The guidance marketplace recommends that a published marketplace be
+organized to avoid both, by treating **the concept** — not the provider
+— as the unit of distribution.
 
 ## The strategy: concepts over providers
 
-Every plugin here represents one capability, named for what it does
-(`guidance-secrets`, not `guidance-aws-secrets-manager`). Inside that one
-plugin, three layers separate "what" from "how":
+Every concept plugin represents one capability, named for what it does
+(`acme-secrets`, not `acme-aws-secrets-manager`). Inside that one
+plugin, three parts separate "what" from "how":
 
 ```
-guidance-<concept>/
+<prefix>-<concept>/
 ├── concept              (Tier 1 — abstract: what this capability does)
 ├── realization-contract (Tier 2 — the schema a provider must satisfy)
 └── realize-<provider>   (Tier 3 — one or more concrete providers)
 ```
+
+Examples use `acme-` as a published marketplace's own plugin prefix;
+`guidance-` names only the guidance marketplace's own plugins.
 
 - **Anything that needs this capability references the concept by
   name** — never a specific provider. A deployment skill that needs
@@ -50,23 +72,24 @@ guidance-<concept>/
   from the workspace — that any provider implementation must satisfy to
   plug in. This is what makes providers swappable: they're not
   compatible by convention, they're compatible by contract.
-- **Providers are interchangeable and extensible.** Where this
+- **Providers are interchangeable and extensible.** Where the defining
   marketplace ships a working provider for a concept, a workspace is
   never left with an abstraction and nothing to run — and a workspace
-  isn't limited to what we ship, either: they can write their own
-  provider skill, satisfy the same contract, and it works identically
-  to a marketplace-shipped one. A concept can also be published with no
-  provider yet at all (see §4) — a deliberate exception, not a gap, for
-  a capability worth naming before anyone has built something to back
-  it.
+  isn't limited to what the defining marketplace ships, either: it can
+  write its own provider skill, satisfy the same contract, and it works
+  identically to one the defining marketplace ships. A concept can also
+  be published with no provider yet at all (see §4) — a deliberate
+  exception, not a gap, for a capability worth naming before anyone has
+  built something to back it.
 
 ## Where the workspace fits in
 
-A workspace using this marketplace makes exactly one kind of decision,
-in exactly one file — `marketplace-plugin-settings.yml` at its root: for
-each concept, *which provider* to use, and *what configuration that
-provider needs* (credentials, endpoints, account IDs, whatever the
-provider's contract calls for).
+A consuming workspace using a published marketplace's concepts makes
+exactly one kind of decision, in exactly one file —
+`marketplace-plugin-settings.yml` at its root: for each concept, *which
+provider* to use, and *what configuration that provider needs*
+(credentials, endpoints, account IDs, whatever the provider's contract
+calls for).
 
 That's the entire integration surface. Nothing about the workspace's own
 skills needs to know which provider is selected — they keep referencing
@@ -76,15 +99,16 @@ reference to a concrete implementation at the point of use.
 ## Why this is safe to adopt: the activation check
 
 The one place this pattern could go wrong quietly is configuration drift
-— a marketplace update renames a provider, or a workspace never filled
-in a required credential, and a skill fails deep inside a provider
-implementation with a confusing error, or worse, silently does the wrong
-thing.
+— an update to the defining marketplace renames a provider, or a
+workspace never filled in a required credential, and a skill fails deep
+inside a provider implementation with a confusing error, or worse,
+silently does the wrong thing.
 
-This marketplace closes that gap with a dedicated check that runs before
-any provider does real work: it reads the workspace's settings, confirms
-the selected provider still exists and matches what's configured, and
-validates every required configuration value is present. If anything is
+The guidance marketplace closes that gap with a dedicated check that
+runs before any provider does real work: it reads the workspace's
+settings, confirms the selected provider still exists and matches
+what's configured, and validates every required configuration value is
+present. If anything is
 wrong, the workspace gets a specific, actionable message — "concept X's
 selected provider Y needs config field Z" — instead of a failure buried
 in provider-specific logic. This is what makes the pattern trustworthy
@@ -93,58 +117,58 @@ early, blocking message, never a silent failure.
 
 ## What adopting this produces
 
-For a workspace:
+For a consuming workspace:
 
 - One configuration file to manage every marketplace capability it uses,
   regardless of how many concepts or providers are involved.
 - The ability to switch providers for any concept — or replace a
-  marketplace-shipped provider with an internal one — without touching
-  any skill that consumes the concept.
+  provider shipped by the defining marketplace with an internal one —
+  without touching any skill that references the concept.
 - A guaranteed default for every concept that ships a realization: it's
   usable immediately after install, with at most some configuration
   values left to fill in, and a clear signal when they're missing. A
   concept published with no realization yet is usable as a stable name
   to reference and build against, even before anything backs it.
 
-For this marketplace's maintainers:
+For a marketplace author:
 
 - New provider support is additive — one new Tier 3 skill against an
   existing contract, not a new plugin with its own conventions to learn.
-- The abstract/contract layers (Tier 1/2) rarely change once a concept
-  is established, so the surface that could break workspace integrations
-  is small and stable.
-- Quality and documentation standards apply once, at the concept level,
-  rather than being re-litigated per provider.
+- The abstract and contract parts (Tier 1 and 2) rarely change once a
+  concept is established, so the surface that could break workspace
+  integrations is small and stable.
+- Quality and documentation standards apply once, per concept, rather
+  than being re-litigated per provider.
 
 ## What this is not
 
-This pattern applies to *concept plugins* distributed through this
-marketplace — plugins meant to represent a capability with swappable
-providers. It is deliberately more structure than a small, single-purpose
-plugin needs, and shouldn't be forced onto one. Whether a given plugin
-in this marketplace should follow this pattern, versus being a simple,
-single-tier plugin, is a judgment call made when the plugin is proposed,
-not a rule applied universally.
+This pattern applies to *concept plugins* distributed through a
+published marketplace — plugins meant to represent a capability with
+swappable providers. It is deliberately more structure than a small,
+single-purpose plugin needs, and shouldn't be forced onto one. Whether a
+given plugin in a published marketplace should follow this pattern,
+versus being a simple, single-tier plugin, is a judgment call made when
+the plugin is proposed, not a rule applied universally.
 
 ## Detailed design
 
 This section is the precise technical specification for the pattern
 described above: how a concept plugin is structured internally, how
 realizations are supplied and configured, and how the activation check
-works. It governs the internal design of concept plugins built for this
+works. It governs the internal design of concept plugins in a published
 marketplace — it does not redefine the Claude Code plugin/marketplace
 standard itself (directory layout, `plugin.json` schema, skill file
 format); see the official docs linked from the README for that.
 
-### 1. A root plugin is a "Concept"
+### 1. A concept plugin represents one "Concept"
 
-Every top-level plugin in `plugins/` that follows this pattern
-represents one abstract capability ("Concept"), named for what it does,
-not for how it's implemented — e.g. `guidance-secrets`, not
-`guidance-aws-secrets-manager`. Concepts are siblings: none depends on
-another's internal structure. A concept may *reference* another concept
-by name alone (see §5) without knowing or caring which realization backs
-it in a given workspace.
+Every plugin in a published marketplace's `plugins/` directory that
+follows this pattern is a concept plugin and represents one abstract
+capability ("Concept"), named for what it does, not for how it's
+implemented — e.g. `acme-secrets`, not `acme-aws-secrets-manager`.
+Concepts are siblings: none depends on another's internal structure. A
+concept may *reference* another concept by name alone (see §5) without
+knowing or caring which realization backs it in a given workspace.
 
 Each concept plugin contains, as skills within that single plugin:
 
@@ -161,8 +185,9 @@ Each concept plugin contains, as skills within that single plugin:
     SKILL.md prose)
   - the **base input configuration schema** a realization requires from
     the consuming workspace (see §3), as a JSON Schema document in
-    `schema.json` — versioned, so both marketplace-shipped and
-    workspace-authored realizations can declare conformance and be
+    `schema.json` — versioned, so both realizations shipped by the
+    defining marketplace and workspace-authored realizations can declare
+    conformance and be
     validated against it mechanically (see §7 for the schema.json
     convention)
   - the identifying name a realization registers under (used in
@@ -184,15 +209,17 @@ Each concept plugin contains, as skills within that single plugin:
 
 ### 2. Realizations may come from two sources
 
-A concept's usable realizations are the union of:
+Counting only what the defining marketplace and the consuming workspace
+provide, a concept's usable realizations are the union of:
 
-- **Marketplace-shipped realizations** — Tier 3 skills bundled directly
-  in the concept plugin in this repo, pre-built bridges for known
+- **Realizations shipped by the defining marketplace** — Tier 3 skills
+  bundled directly in the concept plugin, pre-built bridges for known
   providers.
 - **Workspace-authored realizations** — skills living in the consuming
   workspace's own skill collection (e.g. `.claude/skills/`), which
   declare conformance to a specific concept + Tier 2 contract version
-  by name, without needing to live in or be known to this marketplace.
+  by name, without needing to live in or be known to the defining
+  marketplace.
 
 Both are referenced identically from `marketplace-plugin-settings.yml`
 by a realization name — the settings file doesn't care where a
@@ -235,11 +262,11 @@ end state**, not a half-finished one. This covers two distinct cases,
 both valid:
 
 - **Transitional.** The concept is worth naming and standardizing now,
-  and a first realization is expected later — from this marketplace or
-  from a consuming workspace.
+  and a first realization is expected later — from the defining
+  marketplace or from a consuming workspace.
 - **Permanent.** The concept exists to establish shared vocabulary and
   (once added) a shared contract for an ecosystem of realizations no
-  single marketplace maintainer expects to write themselves — e.g.
+  single marketplace author expects to write themselves — e.g.
   published so other plugins, or workspaces, have a stable name to
   reference and build against.
 
@@ -264,7 +291,7 @@ A concept-only plugin has no default realization and no activation
 check to run — there is nothing yet for a workspace to configure or
 activate. Anything that references this concept by name (§5) must
 handle "no realization currently backs this concept" as an expected
-outcome, not an error, until either a marketplace realization ships or
+outcome, not an error, until either the defining marketplace ships one or
 a workspace authors its own.
 
 ### 5. Cross-concept references stay abstract
@@ -317,8 +344,8 @@ real work. It:
 
 1. Reads `marketplace-plugin-settings.yml` for the concept in question.
 2. Confirms a `realization` is selected and that it matches the
-   realization currently running (catches stale selection after a
-   marketplace update renames/removes a realization).
+   realization currently running (catches stale selection after an
+   update to the defining marketplace renames/removes a realization).
 3. Validates the `config` block against the active realization's
    `schema.json` (§3, §7), reporting specific missing/invalid fields.
 4. If anything fails, halts with a clear, actionable message (what's
@@ -406,7 +433,7 @@ These are recommendations, checked (where mechanical) by
   need to be the thing that speaks to the provider first. Only fall
   back to a direct integration (e.g. calling GitHub's REST API
   directly instead of binding to an existing GitHub MCP/CLI) when no
-  adequate MCP or CLI exists, or when the marketplace creator/operator
+  adequate MCP or CLI exists, or when the marketplace author
   deliberately chooses a direct integration for their own reasons
   (tighter control, no extra runtime dependency, etc.) — that choice is
   theirs to make, but binding to a preexisting MCP/CLI is the
@@ -422,7 +449,7 @@ These are recommendations, checked (where mechanical) by
   reuse a field name from Tier 2's schema with a different meaning.
 - Every field in `schema.json` should have a `description` explaining
   what it's for and, where relevant, an example value — this is the text
-  a workspace author reads when filling in `marketplace-plugin-settings.yml`
+  a workspace owner reads when filling in `marketplace-plugin-settings.yml`
   for the first time, often with no other documentation in hand.
 - Mark optional-but-recommended fields with sensible defaults in the
   schema (`default:`) rather than making everything required — a
@@ -505,28 +532,29 @@ one concept yet.
 ### Consequences
 
 - Adding a new provider for an existing concept means adding one Tier 3
-  skill to the concept plugin (or to a workspace's own skills) — Tier 1
-  and Tier 2 don't change.
+  skill to the concept plugin (or to a consuming workspace's own
+  skills) — Tier 1 and Tier 2 don't change.
 - Consuming workspaces get one predictable file
   (`marketplace-plugin-settings.yml`) and one predictable failure mode
   (a clear activation-check block) regardless of which concept or
   realization is involved.
 - This pattern adds structure/ceremony that a single-purpose plugin
-  doesn't need — it applies to concept plugins in this marketplace, not
-  to every plugin anyone ever writes.
+  doesn't need — it applies to concept plugins in a published
+  marketplace, not to every plugin anyone ever writes.
 - Publishing a concept ahead of any realization (§4) is a valid way to
-  stake out shared vocabulary for a capability before anyone — this
-  marketplace or a consuming workspace — has built something to back
-  it.
+  stake out shared vocabulary for a capability before anyone — the
+  defining marketplace or a consuming workspace — has built something
+  to back it.
 - Naming discipline matters: concept names, realization names, and
   contract versions are the join keys across settings.yml, Tier 2, and
   Tier 3. Renaming any of these is a breaking change for consuming
   workspaces (consistent with the plugin-name stability rule in the
   official plugin standard).
-- The one-contract-per-concept rule (§8) means growth in this marketplace
-  looks like more sibling plugins, not fewer, bigger ones. That's a
-  deliberate trade: more plugins to browse, in exchange for every
-  installed one staying small enough to reason about and swap freely.
+- The one-contract-per-concept rule (§8) means growth in a published
+  marketplace looks like more sibling plugins, not fewer, bigger ones.
+  That's a deliberate trade: more plugins to browse, in exchange for
+  every installed one staying small enough to reason about and swap
+  freely.
 
 ### Open questions (not yet decided)
 
