@@ -1,7 +1,7 @@
 # claude-plugin-guidance
 
 Claude's default plugin guidance tells you the mechanics, not how to
-design a plugin that extends well — this marketplace offers the
+design a plugin that extends well — the guidance marketplace offers the
 concept/realization pattern so a plugin realizes cleanly into real-world
 variation.
 
@@ -11,21 +11,37 @@ Anthropic's plugin/marketplace standard defines the mechanics — manifest
 schema, directory layout, component types — but says nothing about how
 to structure a marketplace repo well as you build it: what naming to
 use, what docs are expected, how to shape a plugin whose capability has
-more than one possible implementation. Without that layer, every
+more than one possible implementation. Without that guidance, every
 marketplace author either reinvents these conventions from scratch or
 drifts into inconsistency one plugin at a time, and a mistake surfaces
-only as a confusing failure downstream, far from the change that caused
+only as a confusing failure later, far from the change that caused
 it.
 
-This marketplace is that missing layer. Install these plugins into your
-marketplace repo and they'll guide you toward good structure as you
-write it, and give you a clear, specific notice when something's off —
-instead of leaving you to remember the rules yourself. It is **not** a
-general-purpose plugin collection, and it's not meant to be installed
-into an ordinary application workspace — it's for the person building
-the marketplace repo itself (a `.claude-plugin/marketplace.json` plus a
-`plugins/` directory), authored so its checks run *as you write*, not
-after.
+The guidance marketplace is that missing authoring toolkit. Install its
+plugins into your marketplace repo and they'll guide you toward good
+structure as you write it, and give you a clear, specific notice when
+something's off — instead of leaving you to remember the rules yourself.
+It is **not** a general-purpose plugin collection, and it's not meant to
+be installed into an ordinary application workspace — it's for the
+marketplace author building the marketplace repo itself (a
+`.claude-plugin/marketplace.json` plus a `plugins/` directory),
+authored so its checks run *as you write*, not after.
+
+## Four roles
+
+The docs name four roles, each by what it does. A repo plays a role
+relative to what it publishes or uses, so one repo can play more than
+one.
+
+| Role | What it is |
+|---|---|
+| **guidance marketplace** | This repo (`claude-plugin-guidance`): authoring tooling for marketplace authors. It ships no concept plugins. |
+| **published marketplace** | A marketplace authored with the guidance marketplace that publishes concept plugins. |
+| **realization marketplace** | A marketplace that offers realizations for concepts owned by an existing published marketplace. |
+| **consuming workspace** | The workspace that registers and uses marketplaces, and selects and configures realizations in `marketplace-plugin-settings.yml`. |
+
+"Tier 1/2/3" names the three parts inside one concept plugin and is
+never used for these roles.
 
 ## The two plugins, together
 
@@ -62,14 +78,14 @@ Run these from inside your marketplace project:
 
 If a plugin you're building represents a capability with more than one
 possible implementation (e.g. secrets, notifications — something with
-swappable providers), this marketplace recommends a specific pattern for
-it: an abstract concept, a contract concrete providers must satisfy, one
-or more provider realizations, and a single settings file where a
-consumer picks and configures a provider.
+swappable providers), the guidance marketplace recommends a specific
+pattern for it: an abstract concept, a contract concrete providers must
+satisfy, one or more provider realizations, and a single settings file
+where a consuming workspace selects and configures a provider.
 
-Read **[How this marketplace works](./docs/architecture.md)** for the
-full explanation and the detailed spec — this README stays intentionally
-short.
+Read **[How the guidance marketplace works](./docs/architecture.md)**
+for the full explanation and the detailed spec — this README stays
+intentionally short.
 
 ## The base standard
 
