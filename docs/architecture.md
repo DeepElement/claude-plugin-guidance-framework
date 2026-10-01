@@ -28,7 +28,8 @@ it never names a role or a relationship between roles.
 A published marketplace can also build on another one; §9 covers how
 those chains are declared and what they may and may not do. §10 covers
 realization marketplaces, which offer realizations for a concept someone
-else defines.
+else defines. §11 covers what a workspace can do when a realization
+breaks.
 
 ## The problem
 
@@ -117,8 +118,10 @@ present. If anything is
 wrong, the workspace gets a specific, actionable message — "concept X's
 selected provider Y needs config field Z" — instead of a failure buried
 in provider-specific logic. This is what makes the pattern trustworthy
-to adopt broadly: a missing or stale configuration is always a clear,
-early, blocking message, never a silent failure.
+to adopt broadly: a missing or stale configuration comes with a clear,
+early, blocking message instead of a failure buried in provider logic.
+It checks configuration against a schema and nothing more; §6 says what it
+cannot catch.
 
 ## What adopting this produces
 
@@ -215,10 +218,9 @@ Each concept plugin contains, as skills within that single plugin:
   - begins its instructions by invoking the activation-check convention
     (§6) before doing any real work
 
-### 2. Realizations may come from two sources
+### 2. Realizations may come from three sources
 
-Counting only what the defining marketplace and the consuming workspace
-provide, a concept's usable realizations are the union of:
+A concept's usable realizations are the union of:
 
 - **Realizations shipped by the defining marketplace** — Tier 3 skills
   bundled directly in the concept plugin, pre-built bridges for known
@@ -229,13 +231,37 @@ provide, a concept's usable realizations are the union of:
   which declare conformance to a specific concept + Tier 2 contract
   version by name, without needing to live in or be known to the
   defining marketplace.
+- **Realizations offered by a realization marketplace** (§10) — Tier 3
+  skills in plugins that depend on a concept another published
+  marketplace defines.
 
-A realization marketplace (§10) is a third source: it offers realizations
-for a concept that another published marketplace defines.
+All three are referenced from `marketplace-plugin-settings.yml` by a
+realization name (§3 covers the qualified form) — the settings file
+doesn't care where a realization physically lives.
 
-Both are referenced identically from `marketplace-plugin-settings.yml`
-by a realization name — the settings file doesn't care where a
-realization physically lives.
+#### Where a workspace-authored realization lives
+
+A workspace-authored realization lives at `.claude/skills/realize-<name>/`
+in the consuming workspace: a `SKILL.md` with a sibling `schema.json`,
+and the same `realizes` block as any other realization (§10). It is a
+skill in the workspace, not a plugin, so it has no `plugin.json` and no
+`dependencies`; the workspace registers the guidance marketplace and
+enables `guidance-activation-check` itself, so the skill's first
+instruction (§6) can run.
+
+This is the location the activation check reads for the realization use
+case, and only one level deep: `realize-<name>/` directly under
+`.claude/skills/`. It is not a restriction on any other local override
+(§10): a workspace may keep whatever else it likes elsewhere, and
+guidance does not look. A realization kept elsewhere is simply not a
+candidate the activation check will find, so a selection that names it is
+reported as stale (§6). `validate-concept-plugin` check B.4 says a
+workspace realization needs no particular path; that is about validating
+the skill's contents, which works wherever the skill is, and it does not
+make a skill outside this location visible to the activation check.
+
+A workspace-authored realization with the same name as an installed one
+wins; see "Defaults and collisions" in §10.
 
 ### 3. Workspace configuration: `marketplace-plugin-settings.yml`
 
@@ -264,6 +290,58 @@ notifications:
   schema (§1, Tier 3; conventions in §7) so tooling and the activation
   check (§6) can validate a workspace's `config` block without
   inspecting the realization's implementation.
+- `realization` is the bare name, or `realization@marketplace` when the
+  bare name matches more than one candidate (below).
+
+This is the one file guidance defines for a workspace's binding. Other
+binding files a workspace may keep are outside what guidance validates.
+
+#### Register, enable, select
+
+A realization offered by a realization marketplace (§10) reaches a
+consuming workspace in three steps, plus a qualification when needed:
+
+| Step | Where | Rule |
+|---|---|---|
+| 1. Register every marketplace involved | `.claude/settings.json` [`extraKnownMarketplaces`](https://code.claude.com/docs/en/settings-reference#extraknownmarketplaces), under a key equal to the marketplace's `name` | Settings are not transitive; §9 says what the workspace must register. Registering makes realizations available and turns none on. |
+| 2. Enable the plugins | `enabledPlugins`, or `claude plugin install` | §9 explains install versus enable. An enabled realization is a candidate for selection. |
+| 3. Select | `marketplace-plugin-settings.yml`, `<concept>: realization: <name>` | The one binding file. |
+| 4. Qualify, only when ambiguous | `realization: aws-secrets-manager@acme-aws-realizations` | Needed only if the bare name matches more than one candidate. The qualifier is the marketplace that ships the realization. |
+
+```yaml
+secrets:
+  realization: aws-secrets-manager@acme-aws-realizations
+  config:
+    region: us-east-1
+```
+
+Each step does one thing, so a newly added marketplace never silently
+replaces a working realization: it adds candidates and selects none. The
+one way it can change what runs is by making a bare name ambiguous, and
+that surfaces as a halt that prints the qualified forms to copy, not as a
+quiet switch. The collision rules are in "Defaults and collisions" (§10).
+
+**Safe sequence** when a second marketplace will offer a realization name
+you already use:
+
+1. Qualify the existing selection first, with the marketplace that ships
+   it (for a realization shipped by the defining marketplace, that
+   marketplace's own `name`).
+2. Register and enable the new marketplace.
+3. Only then, if you want the new realization, change the selection to its
+   qualified name.
+
+A workspace may rebind which realization serves a concept at any time,
+including to one it authored itself (§2). Rebinding is the whole of what
+guidance defines for a workspace's use of a concept; anything else a
+workspace overrides or defines locally is outside what guidance validates
+(§10).
+
+**Status.** The `guidance-activation-check` skill in this repository still
+compares names literally and does not yet resolve qualified names or read
+`.claude/skills/realize-*/`; the resolution rules in this section, §2 and
+§10 are the pattern's, and that skill is updated separately to implement
+them.
 
 ### 4. A concept may be published with no realization at all
 
@@ -324,13 +402,34 @@ activation check (§6) before use.
 **Required reference style.** Write a cross-concept reference as the
 concept name in backticks, exactly as it appears in that concept's
 `plugin.json`/directory naming (e.g. `` `secrets` ``) — the same way this
-document backtick-quotes concept and realization names throughout. This
-is deliberately the *only* form a cross-concept reference takes in
-instruction text: a bare concept name in backticks, never a realization
-name, and never the concept name dressed up as a realization-sounding
-phrase. Treat it like a defined term referencing an appendix entry: the
-backticked name is the whole reference, resolved elsewhere (by the
-activation check, §6), not a description of how it's currently resolved.
+document backtick-quotes concept and realization names throughout. The
+bare name is the default, and it is the form for every reference unless
+the name is ambiguous (below). A reference is always a concept name in
+backticks, never a realization name, and never the concept name dressed
+up as a realization-sounding phrase. Treat it like a defined term
+referencing an appendix entry: the backticked name is the whole
+reference, resolved elsewhere (by the activation check, §6), not a
+description of how it's currently resolved.
+
+| Situation | Form |
+|---|---|
+| The bare name is unique among the concepts enabled in the workspace | Bare: `` `secrets` `` |
+| Two enabled concepts share the bare name | Qualified: `` `secrets@acme-concepts` `` |
+
+- Use the qualified form only when the bare name is ambiguous. The
+  qualifier is the defining marketplace's `name`, so the reference says
+  which concept without naming a realization.
+- `secrets@acme-concepts` is a concept name, not a plugin id: the plugin
+  that defines it is `acme-secrets@acme-concepts`.
+- Ambiguity is judged over every plugin enabled in the workspace, across
+  settings scopes. A skill committed to a shared repo therefore cannot
+  assume what a teammate has enabled, and qualifying a reference that is
+  ambiguous for anyone is the safe choice.
+- A bare reference inside a plugin's own text binds to a concept of that
+  plugin's own marketplace first, then to concepts of the marketplaces it
+  declares dependencies on (§9).
+- A realization's `realizes` block (§10) is a declaration and is always
+  qualified; this table is about references in instruction text.
 
 For example, a `deploy` concept's Tier 1 or a realization's SKILL.md
 should say:
@@ -351,7 +450,10 @@ resolve, and it can change without this instruction text being updated
 to match. `validate-concept-plugin`'s cross-concept reference check
 (check C) scans for this pattern and runs proactively any time a Tier 1
 or Tier 3 file is authored or edited, not only on an explicit audit
-request — see that skill for the mechanical check.
+request — see that skill for the mechanical check. That skill's
+check C3 currently describes the bare backticked name as the only
+correct form and has not been updated for the qualified form, so it can
+report a qualified reference as a style finding (non-blocking).
 
 ### 6. Activation check: a shared convention, not a hook
 
@@ -360,9 +462,11 @@ that any Tier 3 realization's instructions invoke first, before doing
 real work. It:
 
 1. Reads `marketplace-plugin-settings.yml` for the concept in question.
-2. Confirms a `realization` is selected and that it matches the
-   realization currently running (catches stale selection after an
-   update to the defining marketplace renames/removes a realization).
+2. Confirms which realization applies and that it matches the
+   realization currently running: the one the workspace selected, or, with
+   no entry for the concept, the defining marketplace's default (see "No
+   entry for the concept"). This catches a stale selection after an
+   update to the defining marketplace renames or removes a realization.
 3. Validates the `config` block against the active realization's
    `schema.json` (§3, §7), reporting specific missing/invalid fields.
 4. If anything fails, halts with a clear, actionable message (what's
@@ -375,6 +479,47 @@ SKILL.md is expected to invoke it as its first step) rather than a
 Claude Code hook, so it works the same way regardless of how a given
 realization is triggered, and doesn't depend on hook mechanics that may
 change independently of this pattern.
+
+#### No entry for the concept
+
+With no entry in `marketplace-plugin-settings.yml`, the defining
+marketplace's default (§4) is what applies, but only if it can run
+unconfigured:
+
+- A default whose `schema.json` has no required fields runs. The check
+  says it is running the default because nothing was selected, so the
+  workspace sees that it is relying on one.
+- A default whose schema requires config halts, and the message names the
+  missing fields. There is no way to run it without values for them.
+- A realization that is not the default, and a concept with no default
+  (§10), halts as "not selected" or "select one".
+
+A broken or unsuitable default is therefore silent unless the workspace
+selects explicitly: the check validates the default's config, not whether
+the default is any good for this workspace. A workspace that cares which
+realization runs should select it.
+
+#### What the activation check does not do
+
+- It validates `config` against a schema only: required fields and
+  declared types. It never calls a live API.
+- It does not detect that an external API, CLI or MCP server changed
+  behaviour after the realization was written. That breakage first shows
+  when the realization runs (§11 covers what to do about it).
+- It does not verify credentials, reachability or the realization's own
+  logic.
+- It does not authenticate its caller; a skill can pass it any
+  realization name. It shows consistency, not authenticity.
+- It does not gate a skill that merely references a concept (§5). Only a
+  realization's own first instruction runs it.
+
+**Status.** The `guidance-activation-check` skill in this repository today
+halts when there is no entry (it does not fall back to the default) and
+reads the matched realization's `skills/realize-<provider>/schema.json`; the
+no-entry rules and the workspace location of §2 are the pattern's and the
+skill is updated separately to match. It also does not yet compare
+`contractVersion` (§10, "Version axes"): until it does, a realization's
+declared range is not enforced at run time.
 
 ### 7. Best practices per tier
 
@@ -900,6 +1045,55 @@ Rules for `contractVersion`:
    This is guidance for the defining marketplace's author, not something
    a tool checks.
 
+### 11. Resilience: when a realization breaks
+
+An external service changes (an endpoint moves, an API version retires,
+a CLI renames a flag) and a realization that worked yesterday fails. The
+activation check does not see this coming (§6), so the pattern gives
+realization authors a rule that keeps the breakage fixable from
+configuration, and gives the workspace paths to get unblocked.
+
+#### Rule for realization authors
+
+A realization that talks to an external service exposes, as optional
+properties in its `schema.json`, an endpoint (a base URL) and an API or
+tool version, and its operations use them. The `default` of each property
+is the value the realization was tested against. A knob the realization
+ignores does not help, so honouring the property is part of the rule.
+Provider-specific fields belong in Tier 3, not in the Tier 2 base schema
+(§7), which is why this is a rule for realizations and not part of the
+contract. Where a realization has no such external service, its SKILL.md
+says so.
+
+#### The workspace's unblock paths
+
+| Path | Where | Needs |
+|---|---|---|
+| Change config | `marketplace-plugin-settings.yml`, `<concept>.config` | The realization honours the endpoint and version properties |
+| Author its own realization against the unchanged contract | `.claude/skills/realize-<name>/` (§2), then select it | The published Tier 2 only |
+| Register a realization marketplace that ships a fix | `extraKnownMarketplaces`, enable, select (§3) | Such a marketplace exists |
+| Pick another realization of the same concept | Select a different candidate (§3) | Another one is enabled |
+| Take the patch from the marketplace that ships the realization | Update the plugin | A released fix inside its dependents' ranges |
+
+If two installed plugins constrain a shared dependency to ranges that do
+not overlap, Claude Code fails the later install and auto-update leaves
+the dependency where it is, with an entry on the `/plugin` Errors tab
+(see [combining constraints from several plugins](https://code.claude.com/docs/en/plugins/dependencies#combine-constraints-from-several-plugins)).
+The last three paths can then be blocked: the workspace owner removes or
+disables the plugin whose range blocks the update, or asks its author to
+widen the range. A realization marketplace's author publishes a new
+plugin version promptly after a contract MAJOR (§10, "Version axes").
+
+#### When the contract itself breaks
+
+Breakage in the contract is the defining marketplace's to handle: it
+publishes a new Tier 2 `contractVersion` MAJOR (§10, "Version axes"), and
+a realization whose declared range excludes that version is incompatible
+with it. A workspace that cannot wait defines a new, uniquely named
+concept and its own realization, in whatever way it likes; guidance has no
+convention for it, and it serves only new callers, since existing skills
+keep referencing the old concept.
+
 ### Consequences
 
 - Adding a new provider for an existing concept means adding one Tier 3
@@ -916,11 +1110,14 @@ Rules for `contractVersion`:
   stake out shared vocabulary for a capability before anyone — the
   defining marketplace or a consuming workspace — has built something
   to back it.
-- Naming discipline matters: concept names, realization names, and
-  contract versions are the join keys across settings.yml, Tier 2, and
-  Tier 3. Renaming any of these is a breaking change for consuming
-  workspaces (consistent with the plugin-name stability rule in the
-  official plugin standard).
+- Naming discipline matters: concept names, realization names,
+  marketplace names, qualified names (`realization@marketplace`,
+  `concept@marketplace`) and contract versions are the join keys across
+  settings.yml, Tier 2, Tier 3 and the `realizes` blocks. Renaming any
+  of these is a breaking change for consuming workspaces (consistent
+  with the plugin-name stability rule in the official plugin standard).
+  A mirror or fork of a marketplace must keep its `name`, since the
+  qualifiers refer to it.
 - The one-contract-per-concept rule (§8) means growth in a published
   marketplace looks like more sibling plugins, not fewer, bigger ones.
   That's a deliberate trade: more plugins to browse, in exchange for
