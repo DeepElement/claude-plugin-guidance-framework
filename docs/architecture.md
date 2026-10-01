@@ -275,7 +275,11 @@ A concept-only plugin needs only its Tier 1 `skills/concept/SKILL.md`.
 realization is being added** — writing a contract with nothing yet
 implementing it is premature; the contract exists to describe what a
 realization must satisfy, so it earns its place at the same time as
-that first realization.
+that first realization. A concept-only plugin is a complete unit to
+publish on its own: add Tier 2 and a first Tier 3 realization in a later
+change, whenever one is ready. `validate-concept-plugin` recognizes a
+concept-only plugin and doesn't ask for a Tier 2 or Tier 3 you haven't
+written.
 
 If a concept *does* ship one or more Tier 3 realizations, the existing
 rules still apply in full: Tier 2 must exist and be published, and
@@ -364,6 +368,12 @@ change independently of this pattern.
 These are recommendations, checked (where mechanical) by
 `validate-concept-plugin` in `guidance-conventions`. They describe what a
 *good* Tier 1/2/3 looks like, beyond the structural minimum in §1–§6.
+
+Run `validate-concept-plugin` against a concept plugin before publishing
+a change to it. It checks structure, contract/schema validity, naming,
+activation-check invocation and cross-concept reference style, and flags
+(non-blocking) any sign the plugin should be split or has drifted from
+these conventions.
 
 #### Tier 1 — Concept skill
 

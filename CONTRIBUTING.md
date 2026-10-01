@@ -5,8 +5,7 @@ repo is the guidance marketplace — an authoring toolkit for marketplace
 authors building their own Claude Code plugin marketplaces. See the
 [README](./README.md) for what it is, and
 [docs/architecture.md](./docs/architecture.md) for the four role names
-used here and the concept/realization pattern referenced throughout this
-guide.
+used here and the concept/realization pattern the tooling implements.
 
 ## Before you start
 
@@ -65,6 +64,28 @@ consuming workspace. "Tier" is reserved for Tier 1/2/3 inside one concept
 plugin; never use "tier", "level" or "layer" for a role or for a
 relationship between roles.
 
+## What belongs here
+
+The guidance marketplace ships authoring tooling for marketplace authors,
+not concept plugins — see [the four roles](./docs/architecture.md#the-four-roles).
+A contribution is usually one of:
+
+- A new `guidance-<name>` tooling plugin, or a new skill in an existing
+  one (`guidance-conventions`, `guidance-activation-check`).
+- A change to how an existing skill checks or guides authors, including
+  `validate-concept-plugin` and the activation check, which implement the
+  concept/realization pattern. Keep them consistent with
+  [docs/architecture.md](./docs/architecture.md); a change that alters the
+  pattern itself is an architecture change (open an issue first).
+- A docs change.
+
+If you're authoring concept plugins for your own published marketplace
+rather than changing this repo, start from the architecture doc: it
+covers how a concept plugin is structured (§1), concept-only plugins
+(§4), referencing another concept (§5), per-tier best practices (§7) and
+the one-contract split rule (§8). Those plugins live in your marketplace,
+not in a pull request here.
+
 ## Adding a plugin
 
 1. Create `plugins/guidance-<name>/.claude-plugin/plugin.json` following
@@ -73,60 +94,6 @@ relationship between roles.
    pointing at `./plugins/guidance-<name>`.
 3. Run `validate-marketplace` (from `guidance-conventions`) to check it
    against the conventions above.
-
-### If your plugin represents a swappable capability
-
-If what you're building has more than one reasonable implementation
-(e.g. it wraps a provider, a service, or a technology that a consuming
-workspace might want to swap out), it should follow the concept/realization
-pattern described in full in
-[docs/architecture.md](./docs/architecture.md). In short:
-
-- One **Tier 1 concept** skill (`skills/concept/`) describing the
-  capability abstractly, with no provider-specific detail. This alone
-  is a complete, publishable plugin — see "Concept-only plugins" below.
-- One **Tier 2 realization contract** (`skills/realization-contract/`),
-  with a `schema.json` sibling file, defining what any realization must
-  satisfy. Required once you're adding a first realization, not before.
-- One or more **Tier 3 realizations** (`skills/realize-<provider>/`),
-  each with its own `schema.json` superset, at least one marked as the
-  plugin's default. Prefer binding a realization to an existing public
-  MCP server or CLI for that provider over implementing a direct
-  service integration from scratch — see architecture doc §7.
-- Each realization invokes the activation check
-  (`guidance-activation-check`) as its first instruction.
-
-**One concept plugin, one contract.** If you find yourself needing a
-second, incompatible `schema.json` for the same plugin, that's a sign
-the plugin is actually two concepts — split it into sibling plugins
-instead (see architecture doc §8). The same drift is often visible
-straight from Tier 1's prose, before any second contract exists: if your
-concept's operations don't share one coherent verb+object, or its
-"when to use this" reads as more than one scenario, split before writing
-Tier 2 — see architecture doc §7.
-
-**Referencing another concept.** If your plugin needs another concept's
-capability, reference it by that concept's bare name in backticks (e.g.
-`` `secrets` ``) — never by a specific realization's name, and never
-assume one is active (see architecture doc §5). This is the only form a
-cross-concept reference takes; treat it like a defined term pointing at
-that concept's own Tier 1 skill.
-
-Run `validate-concept-plugin` (from `guidance-conventions`) against your
-plugin before opening a PR; it checks structure, contract/schema
-validity, naming, activation-check invocation, cross-concept reference
-style, and flags (non-blocking) any sign the plugin should be split or
-has drifted from these conventions.
-
-#### Concept-only plugins
-
-You don't need a realization in hand to propose a concept. Publishing
-Tier 1 alone — no contract, no realization — is a valid, complete PR if
-the capability is worth naming now, whether or not anyone (including
-you) is ready to build a realization for it yet. `validate-concept-plugin`
-recognizes this as a concept-only plugin and doesn't ask for a Tier 2 or
-Tier 3 you haven't written. Add Tier 2 and a first Tier 3 realization in
-a later PR whenever one is ready — see architecture doc §4.
 
 ## Reporting bugs and requesting features
 
