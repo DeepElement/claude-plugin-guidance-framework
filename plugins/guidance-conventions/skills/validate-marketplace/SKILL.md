@@ -5,11 +5,13 @@ description: Validate a Claude Code plugin marketplace repository against DeepEl
 
 # Validate Marketplace
 
-Checks a Claude Code plugin marketplace repository against DeepElement's
-guidance conventions. This skill does **not** validate the plugin/marketplace
-file schema itself (required fields, allowed types, directory layout) — that
-standard is owned and maintained by Anthropic and evolves independently of
-this plugin. For schema validity, defer to the official docs:
+Checks the marketplace under validation, a Claude Code plugin marketplace
+repository (typically a published marketplace authored with the guidance
+marketplace), against DeepElement's guidance conventions. This skill does
+**not** validate the plugin/marketplace file schema itself (required
+fields, allowed types, directory layout) — that standard is owned and
+maintained by Anthropic and evolves independently of this plugin. For
+schema validity, defer to the official docs:
 
 - Plugins reference: https://code.claude.com/docs/en/plugins-reference
 - Creating plugins: https://code.claude.com/docs/en/plugins
@@ -34,8 +36,8 @@ part of the standard itself.
 2. **Plugin naming prefix.** Every plugin directory under `plugins/`, and
    the corresponding `name` in its `.claude-plugin/plugin.json`, should
    share one consistent short prefix derived from the marketplace's own
-   namespace (e.g. `guidance-<name>` in this repo). Flag any plugin whose
-   name doesn't share the established prefix.
+   namespace (e.g. `guidance-<name>` in the guidance marketplace). Flag
+   any plugin whose name doesn't share the established prefix.
 
 3. **Required top-level docs.** The repo root should have:
    - `README.md` describing the marketplace, how to add it
@@ -50,11 +52,11 @@ part of the standard itself.
    since the base standard is a living convention that can change out from
    under a static description.
 
-5. **Attribution note (if this repo's license model is reused).** If the
-   target repo's LICENSE contains a public-attribution clause (as opposed
-   to plain MIT/Apache/BSD), confirm the README states the attribution
-   requirement in plain language, not just by reference to a LICENSE
-   section number.
+5. **Attribution note (if the guidance marketplace's license model is
+   reused).** If the LICENSE of the marketplace under validation contains
+   a public-attribution clause (as opposed to plain MIT/Apache/BSD),
+   confirm the README states the attribution requirement in plain
+   language, not just by reference to a LICENSE section number.
 
 ## How to run the check
 
@@ -65,7 +67,7 @@ part of the standard itself.
    `.claude-plugin/plugin.json`.
 4. Run checks 1–5 above.
 5. Report findings grouped as **Schema issues** (point to official docs)
-   vs. **Convention issues** (this plugin's own opinions), each with the
-   file and a one-line fix suggestion. Do not silently auto-fix — report
-   and let the user decide, unless they've explicitly asked you to fix
-   issues found.
+   vs. **Convention issues** (the guidance marketplace's own opinions),
+   each with the file and a one-line fix suggestion. Do not silently
+   auto-fix — report and let the user decide, unless they've explicitly
+   asked you to fix issues found.
