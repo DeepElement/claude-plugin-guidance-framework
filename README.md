@@ -87,6 +87,11 @@ Read **[How the guidance marketplace works](./docs/architecture.md)**
 for the full explanation and the detailed spec — this README stays
 intentionally short.
 
+If your published marketplace builds on another published marketplace's
+concepts, [§9 of that document](./docs/architecture.md#9-chains-of-published-marketplaces)
+covers how to declare the dependency and what a consuming workspace must
+register.
+
 ## The base standard
 
 This repo doesn't redefine the Claude Code plugin/marketplace standard
