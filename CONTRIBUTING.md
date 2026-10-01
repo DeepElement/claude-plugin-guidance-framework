@@ -31,7 +31,7 @@ review). To contribute:
 3. Run the relevant validation skill (see below) and fix anything it
    flags.
 4. Open a PR describing what changed and why.
-5. A maintainer reviews and merges.
+5. A guidance maintainer reviews and merges.
 
 Keep PRs focused — one plugin, one doc change, or one fix per PR, rather
 than bundling unrelated changes together.
@@ -94,6 +94,61 @@ not in a pull request here.
    pointing at `./plugins/guidance-<name>`.
 3. Run `validate-marketplace` (from `guidance-conventions`) to check it
    against the conventions above.
+
+## Plugin versions and releases
+
+Other marketplaces resolve a plugin's version range against release tags,
+so each plugin here is versioned and tagged on its own. The mechanism
+(tag format, how ranges resolve) is documented in
+[Plugin dependencies](https://code.claude.com/docs/en/plugins/dependencies);
+this section covers only what this repo does with it.
+
+### Version policy
+
+- Set `version` in the plugin's `.claude-plugin/plugin.json` only. Do not
+  also set it on the entry in `.claude-plugin/marketplace.json`.
+- Every pull request that changes anything inside a plugin's directory
+  (behaviour, skill prose or the manifest) bumps that plugin's `version`.
+  A change only outside `plugins/` (README, docs, CONTRIBUTING, CI) does
+  not. Wording-only changes made before a plugin's first tag need no bump.
+- Pick the bump by what a dependent can observe:
+  - **MAJOR** — a change a dependent can fail on: a check that newly
+    halts, a skill renamed or removed, or a change to a skill's arguments.
+  - **MINOR** — additive: a new skill, check or option that leaves
+    existing use working.
+  - **PATCH** — fixes, and prose or manifest edits inside a plugin.
+
+### Releasing
+
+Tags are per plugin, named `<plugin>--v<version>` (for example
+`guidance-activation-check--v1.0.0`). The `workspace-v*` tags in this
+repo are created by the control plane and are unrelated to plugin tags.
+
+After the pull request merges, the guidance maintainer tags the merge commit
+from a clean working tree:
+
+```sh
+git checkout main && git pull
+claude plugin tag plugins/guidance-<name> --push
+```
+
+`claude plugin tag` derives the tag from `plugin.json`; see the
+[CLI reference](https://code.claude.com/docs/en/plugins/cli-reference#plugin-tag)
+for its options. The plugins are relative-path sources, so their tags live
+in this repo.
+
+### Release schedule
+
+- `guidance-conventions` and `guidance-activation-check` are first tagged
+  `0.1.0`, by the guidance maintainer, on the merge commit of the pull
+  request adding this section. The `0.1.0` tag holds exactly the plugin
+  contents at that commit; any later change to either plugin bumps its
+  `version` under the policy above and is not part of `0.1.0`.
+- `guidance-activation-check` is tagged `1.0.0` when the guidance
+  maintainers decide it is ready to depend on. Until that tag exists, no
+  guidance doc tells anyone to depend on a guidance plugin.
+- `guidance-conventions` is authoring-time tooling and is not a documented
+  dependency target.
 
 ## Reporting bugs and requesting features
 
