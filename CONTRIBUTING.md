@@ -147,8 +147,11 @@ in this repo.
   contents at that commit; any later change to either plugin bumps its
   `version` under the policy above and is not part of `0.1.0`.
 - `guidance-activation-check` is tagged `1.0.0` when the guidance
-  maintainers decide it is ready to depend on. Until that tag exists, no
-  guidance doc tells anyone to depend on a guidance plugin.
+  maintainers decide it is ready to depend on. The order is: the pull
+  request that releases it merges, the guidance maintainer pushes
+  `guidance-activation-check--v1.0.0`, and only then does the change that
+  tells anyone to depend on a guidance plugin merge, since a range such
+  as `^1.0.0` is not satisfied before that tag exists.
 - `guidance-conventions` is authoring-time tooling and is not a documented
   dependency target.
 
