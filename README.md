@@ -37,7 +37,7 @@ one.
 |---|---|
 | **guidance marketplace** | This repo (`claude-plugin-guidance`): authoring tooling for marketplace authors. It ships no concept plugins. |
 | **published marketplace** | A marketplace authored with the guidance marketplace that publishes concept plugins. |
-| **realization marketplace** | A marketplace that offers realizations for concepts owned by an existing published marketplace. |
+| **[realization marketplace](./docs/architecture.md#10-realization-marketplaces)** | A marketplace that offers realizations for concepts owned by an existing published marketplace. |
 | **consuming workspace** | The workspace that registers and uses marketplaces, and selects and configures realizations in `marketplace-plugin-settings.yml`. |
 
 "Tier 1/2/3" names the three parts inside one concept plugin and is
@@ -90,7 +90,9 @@ intentionally short.
 If your published marketplace builds on another published marketplace's
 concepts, [§9 of that document](./docs/architecture.md#9-chains-of-published-marketplaces)
 covers how to declare the dependency and what a consuming workspace must
-register.
+register. To offer realizations for a concept that another published
+marketplace defines, see
+[§10](./docs/architecture.md#10-realization-marketplaces).
 
 ## The base standard
 

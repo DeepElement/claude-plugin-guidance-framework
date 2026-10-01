@@ -83,8 +83,9 @@ If you're authoring concept plugins for your own published marketplace
 rather than changing this repo, start from the architecture doc: it
 covers how a concept plugin is structured (§1), concept-only plugins
 (§4), referencing another concept (§5), per-tier best practices (§7),
-the one-contract split rule (§8) and building on another published
-marketplace (§9). Those plugins live in your marketplace,
+the one-contract split rule (§8), building on another published
+marketplace (§9) and offering realizations for another marketplace's
+concepts (§10). Those plugins live in your marketplace,
 not in a pull request here.
 
 ## Adding a plugin
