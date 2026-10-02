@@ -862,6 +862,36 @@ locally: a dependency entry that names a marketplace also matches a
 `--plugin-dir` copy of that plugin on v2.1.242 or later (see
 [test a plugin and its dependency locally](https://code.claude.com/docs/en/plugins/dependencies#test-a-plugin-and-its-dependency-locally)).
 
+#### Validator severity and migrating a chain
+
+`validate-marketplace` checks what this section describes in two sets:
+set U (U1-U4, the declarations: placement, form, allowlist and the README
+section) and set AD (AD1-AD3, the additive-only rule). The first
+`guidance-conventions` release after the warnings shipped reported every
+finding in them as a warning. The release that makes them block (see the
+release tags) can fail a published marketplace, or a realization
+marketplace (set U only), that an earlier release passed.
+Three findings stay non-blocking: an open-ended version range (U2), a
+README range that differs from the entry's (U4), and an upstream
+published marketplace that is not on disk (AD2, "unverified"), because
+they report a range the validator does not parse, README wording, or
+something it could not read.
+
+To migrate, fix what the finding names:
+
+| Finding | Fix |
+|---|---|
+| U1: a cross-marketplace dependency in `plugin.json` | Move it to the marketplace entry. |
+| U2: a string form, or an object with no `version` | Write the object form with `name`, `marketplace` and a `version` range (recipe step 1). |
+| U3: a marketplace an entry names is not in the root allowlist | Add it to `allowCrossMarketplaceDependenciesOn` (recipe step 2). |
+| U4: no `## Required marketplaces` section, or no row for an allowlisted marketplace | Add the section from the template above. |
+| AD1: two plugins define one concept name | Rename one under the marketplace's own prefix. |
+| AD2: a plugin name, concept name or prefix equals an upstream's | Rename with the marketplace's own prefix. |
+| AD3: a plugin with realizations and no concept of its own, or a `realizes` block naming another marketplace's concept | Move the realizations to a realization marketplace (§10). |
+
+Renaming a published plugin is a breaking change for the consuming
+workspaces that use it (see Consequences).
+
 ### 10. Realization marketplaces
 
 A realization marketplace offers realizations (Tier 3 only) for concepts

@@ -97,12 +97,12 @@ rather than restating it.
 
 | Id | Pass | Fail | Severity |
 |---|---|---|---|
-| **U1** Placement | Every cross-marketplace dependency is in the marketplace entry | One is in a plugin's `plugin.json` | Warning |
-| **U2** Form | Each is an object with `name`, `marketplace` and `version` | A string form, or an object with no `version` | Warning |
-| | | A `version` that is textually open-ended (`*`, `x`, empty, `latest`, or a bare `>=`) | Warning |
-| **U3** Allowlist | Every marketplace named by an entry's dependencies is in the root `allowCrossMarketplaceDependenciesOn` (direct dependencies only) | A named marketplace is missing, or the root has no allowlist | Warning |
-| **U4** README section | The README has a `## Required marketplaces` section in the [architecture.md §9 template](../../../../docs/architecture.md#readme-template--required-marketplaces), with the template's column order and a row for every allowlisted marketplace giving its registration source; the plugin names in each row match the entries | The section, or a row for an allowlisted marketplace, is missing | Warning |
-| | | A row's range text differs from the entry's `version` | Warning |
+| **U1** Placement | Every cross-marketplace dependency is in the marketplace entry | One is in a plugin's `plugin.json` | Blocking |
+| **U2** Form | Each is an object with `name`, `marketplace` and `version` | A string form, or an object with no `version` | Blocking |
+| | | A `version` that is textually open-ended (`*`, `x`, empty, `latest`, or a bare `>=`) | Non-blocking |
+| **U3** Allowlist | Every marketplace named by an entry's dependencies is in the root `allowCrossMarketplaceDependenciesOn` (direct dependencies only) | A named marketplace is missing, or the root has no allowlist | Blocking |
+| **U4** README section | The README has a `## Required marketplaces` section in the [architecture.md §9 template](../../../../docs/architecture.md#readme-template--required-marketplaces), with the template's column order and a row for every allowlisted marketplace giving its registration source; the plugin names in each row match the entries | The section, or a row for an allowlisted marketplace, is missing | Blocking |
+| | | A row's range text differs from the entry's `version` | Non-blocking |
 
 An entry-level `dependencies` list is the one Claude Code enforces for a
 cross-marketplace dependency, which is why U1 asks for it there. U3 reads
@@ -117,7 +117,7 @@ entry, and the root must allowlist `claude-plugin-guidance`. That is check
 A8 in `validate-concept-plugin`, which reports it as blocking. When both
 skills run, report a missing or malformed declaration of that one
 dependency, and a missing allowlist entry for its marketplace, under A8
-only, and do not repeat it as a U1, U2 or U3 warning. U4 and an open-ended
+only, and do not repeat it as a U1, U2 or U3 finding. U4 and an open-ended
 range (U2) are still reported here.
 
 ## Additive-only chains (set AD)
@@ -133,11 +133,11 @@ mixed prefixes, take each plugin's concept name from its own first segment.
 
 | Id | Pass | Fail | Severity |
 |---|---|---|---|
-| **AD1** Unique concept names | Each concept name is defined by one plugin in the marketplace under validation | Two plugins define the same concept name (for example `acme-secrets` and `beacon-secrets`) | Warning |
-| **AD2** No overlap with an upstream | No plugin name, concept name or prefix of the marketplace under validation equals one of an upstream published marketplace's whose copy is on disk | An overlap, naming both plugins and the shared name or prefix | Warning |
-| | | An upstream published marketplace named by an entry dependency is not on disk, so overlap cannot be checked ("unverified") | Warning |
-| **AD3** Realizations stay with their concept | Every plugin with a `skills/realize-*/` skill also has its own `skills/concept/`, and every `realizes` block in the marketplace under validation names a concept it defines | A plugin has realizations and no `skills/concept/` of its own (a realization-only plugin) | Warning |
-| | | A `realizes` block whose qualifier is not the `name` of the marketplace under validation, or whose concept name is not the concept name of any of its concept plugins | Warning |
+| **AD1** Unique concept names | Each concept name is defined by one plugin in the marketplace under validation | Two plugins define the same concept name (for example `acme-secrets` and `beacon-secrets`) | Blocking |
+| **AD2** No overlap with an upstream | No plugin name, concept name or prefix of the marketplace under validation equals one of an upstream published marketplace's whose copy is on disk | An overlap, naming both plugins and the shared name or prefix | Blocking |
+| | | An upstream published marketplace named by an entry dependency is not on disk, so overlap cannot be checked ("unverified") | Non-blocking |
+| **AD3** Realizations stay with their concept | Every plugin with a `skills/realize-*/` skill also has its own `skills/concept/`, and every `realizes` block in the marketplace under validation names a concept it defines | A plugin has realizations and no `skills/concept/` of its own (a realization-only plugin) | Blocking |
+| | | A `realizes` block whose qualifier is not the `name` of the marketplace under validation, or whose concept name is not the concept name of any of its concept plugins | Blocking |
 
 For AD2, an upstream published marketplace is a marketplace named in an
 entry's cross-marketplace dependency, other than the guidance marketplace,
@@ -175,13 +175,20 @@ check 2, not here.
 that has `skills/realization-contract/` or `skills/realize-*/` but no
 `skills/concept/` under its check 1, not marked non-blocking there. AD3
 reports the realization-only case for the marketplace as a whole, as a
-warning. AD3 does not change or downgrade check 1: when both skills run,
-the check 1 finding keeps its own severity, and AD3 is the
+blocking finding. AD3 does not change or downgrade check 1: when both
+skills run, the check 1 finding keeps its own severity, and AD3 is the
 marketplace-level view of it. In a realization marketplace that same shape
 is the expected one, and `validate-concept-plugin` checks it with set E.
 
-**Severity.** U and AD findings are warnings; report them and do not treat
-them as failing the validation.
+**Severity.** A set U or set AD finding marked Blocking fails the
+validation. Three stay non-blocking: an open-ended range (U2), a README
+range that differs from the entry (U4) and an upstream that is not on
+disk (AD2, "unverified"). They report a range this skill does not parse,
+wording in the README, or something it could not read, not a wrong
+declaration; report them and do not treat them as failing the
+validation. M2 is non-blocking too, as it says above. How an existing
+marketplace migrates is in
+[architecture.md §9](../../../../docs/architecture.md#validator-severity-and-migrating-a-chain).
 
 ## How to run the check
 
@@ -200,7 +207,7 @@ them as failing the validation.
 5. Report findings grouped as **Schema issues** (point to official docs)
    vs. **Convention issues** (the guidance marketplace's own opinions),
    each with the file and a one-line fix suggestion. Name each finding's
-   check id (M1–M5, U1–U4, AD1–AD3); findings from sets U and AD are
-   reported as warnings (see "Severity" under set AD). Do not silently
-   auto-fix — report and let the user decide, unless they've explicitly
-   asked you to fix issues found.
+   check id (M1–M5, U1–U4, AD1–AD3) and whether it is blocking (see
+   "Severity" under set AD). Do not silently auto-fix — report and let
+   the user decide, unless they've explicitly asked you to fix issues
+   found.
