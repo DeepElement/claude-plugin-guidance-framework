@@ -18,7 +18,7 @@ a published marketplace and a consuming workspace.
 |---|---|
 | **guidance marketplace** | `claude-plugin-guidance` itself (`DeepElement/claude-plugin-guidance-framework`): authoring tooling for marketplace authors (`guidance-conventions`, `guidance-activation-check`). It ships no concept plugins. |
 | **published marketplace** | A marketplace authored with the guidance marketplace that publishes concept plugins (§1). Each concept plugin makes its marketplace that concept's **defining marketplace**. |
-| **realization marketplace** | A marketplace that offers realizations for concepts owned by an existing published marketplace. |
+| **realization marketplace** | A marketplace that offers realizations for concepts owned by an existing published marketplace (§10). |
 | **consuming workspace** | The workspace (repo, project, or control plane) that registers and uses marketplaces, selects and configures realizations in `marketplace-plugin-settings.yml` (§3), and may author realizations of its own (§2). |
 
 Bare "workspace" in these docs means a consuming workspace. "Tier" is
@@ -26,7 +26,9 @@ reserved for Tier 1/2/3, the three parts inside one concept plugin (§1);
 it never names a role or a relationship between roles.
 
 A published marketplace can also build on another one; §9 covers how
-those chains are declared and what they may and may not do.
+those chains are declared and what they may and may not do. §10 covers
+realization marketplaces, which offer realizations for a concept someone
+else defines.
 
 ## The problem
 
@@ -222,10 +224,14 @@ provide, a concept's usable realizations are the union of:
   bundled directly in the concept plugin, pre-built bridges for known
   providers.
 - **Workspace-authored realizations** — skills living in the consuming
-  workspace's own skill collection (e.g. `.claude/skills/`), which
-  declare conformance to a specific concept + Tier 2 contract version
-  by name, without needing to live in or be known to the defining
-  marketplace.
+  workspace's own skill collection (e.g. `.claude/skills/`; see
+  [where skills live](https://code.claude.com/docs/en/skills#where-skills-live)),
+  which declare conformance to a specific concept + Tier 2 contract
+  version by name, without needing to live in or be known to the
+  defining marketplace.
+
+A realization marketplace (§10) is a third source: it offers realizations
+for a concept that another published marketplace defines.
 
 Both are referenced identically from `marketplace-plugin-settings.yml`
 by a realization name — the settings file doesn't care where a
@@ -295,7 +301,8 @@ concept skill), so a workspace that installs a concept with any shipped
 realizations can use it immediately, without first having to author or
 select one — they may still need to fill in required `config` values,
 which is the activation check's job to surface (§6), not a reason the
-concept fails to have a usable default.
+concept fails to have a usable default. The default belongs to the
+defining marketplace; a realization marketplace never ships one (§10).
 
 A concept-only plugin has no default realization and no activation
 check to run — there is nothing yet for a workspace to configure or
@@ -432,7 +439,9 @@ these conventions.
 - Version the contract explicitly (a `contractVersion` field in
   `schema.json`, e.g. `"1.0.0"`). Bump it on any breaking change to the
   base schema or required operations, so realizations and the activation
-  check can detect incompatibility instead of failing confusingly.
+  check can detect incompatibility instead of failing confusingly. What
+  counts as breaking, and how this number relates to the plugin's own
+  version, is in §10 ("Version axes").
 - Write at least one realistic example `config` block satisfying the
   base schema, even though Tier 2 has no concrete provider — this is
   what a workspace-authored realization's author copies as a starting
@@ -694,6 +703,203 @@ locally: a dependency entry that names a marketplace also matches a
 `--plugin-dir` copy of that plugin on v2.1.242 or later (see
 [test a plugin and its dependency locally](https://code.claude.com/docs/en/plugins/dependencies#test-a-plugin-and-its-dependency-locally)).
 
+### 10. Realization marketplaces
+
+A realization marketplace offers realizations (Tier 3 only) for concepts
+owned by an existing published marketplace. §9 explains why a published
+marketplace cannot do this for a concept it does not define; this section
+covers the project type that can.
+
+#### Definition and purpose
+
+- It exists so a provider can be added for someone else's concept without
+  that concept's defining marketplace having to ship or accept it.
+- It targets a contract that is already published: a qualified concept
+  name plus a `contractVersion` range (see "The `realizes` declaration").
+- It never overrides or extends a concept, and never edits Tier 1 or
+  Tier 2. Those stay with the defining marketplace.
+- Its realizations are never the default (see "Defaults and collisions").
+- A concept-only plugin (§4) cannot be targeted, because there is no Tier 2
+  contract to satisfy; the author asks the defining marketplace to publish
+  one first. A plugin with a contract and no realizations can be targeted.
+  It has no default, so a workspace must select a realization for it.
+- A realization plugin targets one concept. A plugin may ship several
+  realizations of it.
+
+#### Who provides realizations
+
+| Source of realizations | May provide | Never |
+|---|---|---|
+| The concept's defining marketplace | The default (exactly one, in the concept plugin; see §4) and any other realizations | n/a |
+| A realization marketplace | Non-default realizations targeting the published contract | Override or extend a concept; edit Tier 1 or Tier 2; ship the default |
+| The consuming workspace | Its own realizations of a published contract (§2) | n/a |
+| Another published marketplace | Nothing for a concept it does not define | Any realization of that concept (§9) |
+
+Guidance does not police what a consuming workspace overrides locally:
+it may reuse the name of a plugin or skill it has installed, or define
+concepts of its own, in whatever way it likes, and those local choices are
+outside what guidance validates. The Tier 1 and Tier 2 parts of a
+published marketplace's concept plugin are still never edited by a
+realization marketplace or by a downstream published marketplace.
+
+#### Directory layout and naming
+
+```
+acme-aws-realizations/                       # marketplace name
+├── .claude-plugin/marketplace.json
+├── README.md                                # includes ## Required marketplaces
+└── plugins/
+    └── acme-aws-realize-secrets/            # <prefix>-realize-<concept>
+        ├── .claude-plugin/plugin.json
+        └── skills/
+            └── realize-aws-secrets-manager/
+                ├── SKILL.md                 # `realizes` block; activation check first
+                └── schema.json              # superset of the defining plugin's Tier 2 schema
+```
+
+- There is no `skills/concept/` and no `skills/realization-contract/`. A
+  second copy of the contract would be a second contract (§8).
+- A plugin targets exactly one concept and may ship several `realize-*`
+  skills for it.
+- `<prefix>-realize-<concept>` is the recommended plugin name, with the
+  realization marketplace's own prefix. It is a recommendation, and it
+  never starts with `guidance-`, which names only the guidance
+  marketplace's own plugins.
+- Skills are namespaced by their plugin, for example
+  `/acme-aws-realize-secrets:realize-aws-secrets-manager`
+  ([where skills live](https://code.claude.com/docs/en/skills#where-skills-live)).
+- Each realization follows the Tier 3 conventions in §7: named after the
+  provider, a `schema.json` that is a strict superset of the Tier 2
+  schema, and the activation check (§6) invoked first.
+
+#### The `realizes` declaration
+
+Each realization's `SKILL.md` carries a fenced block, in the same
+"declared in SKILL.md" convention as §1. It is not a manifest field.
+
+~~~markdown
+```realizes
+concept: secrets@acme-concepts
+contractVersion: "^1.1.0"
+```
+~~~
+
+- `concept` is `<concept>@<marketplace>`. The concept name is as defined
+  in §1, and the qualifier is the defining marketplace's own `name`.
+  The block is a declaration, not a cross-concept reference in instruction
+  text, so the bare-name style of §5 does not apply to it.
+- `contractVersion` is a semantic-version range, written as in a
+  dependency's `version` field (see
+  [declaring a version constraint](https://code.claude.com/docs/en/plugins/dependencies#declare-a-dependency-with-a-version-constraint)),
+  with no pre-release suffix. A realization is compatible when the Tier 2
+  `contractVersion` of the concept it targets satisfies the range (see
+  "Version axes").
+- The block is required in a realization marketplace and in a
+  workspace-authored realization. It is recommended in the realizations
+  the defining marketplace ships in its own concept plugin.
+- There is no default marker. The defining plugin is the entry dependency
+  (next section) whose marketplace equals the qualifier in `concept`.
+
+#### Dependency, allowlist and README
+
+A realization plugin's marketplace entry declares a dependency on the
+concept plugin it implements, in the object form of §9 with a semver
+range, and the root marketplace allowlists the defining marketplace and
+lists it in the README:
+
+```json
+{
+  "name": "acme-aws-realizations",
+  "allowCrossMarketplaceDependenciesOn": ["acme-concepts"],
+  "plugins": [
+    {
+      "name": "acme-aws-realize-secrets",
+      "source": "./plugins/acme-aws-realize-secrets",
+      "dependencies": [
+        { "name": "acme-secrets", "marketplace": "acme-concepts", "version": "^1.2.0" }
+      ]
+    }
+  ]
+}
+```
+
+(Other required manifest fields are omitted here.)
+
+The README carries the `## Required marketplaces` section from §9, with a
+row for the defining marketplace:
+
+| Marketplace name | Registration source | Plugins used (range) | Why |
+|---|---|---|---|
+| `acme-concepts` | `acme/acme-concepts` (GitHub) | `acme-secrets` `^1.2.0` | Defines `secrets`; the realizations here target it |
+
+The authoring recipe, placement rules and what the consuming workspace
+must register are those of §9; the dependency is declared on the entry
+and not in `plugin.json`, exactly as there. Installing a realization
+plugin with `claude plugin install` also installs the concept plugin it
+depends on, including the realizations the defining marketplace ships in
+it; §9 says what enabling alone does not do. Installing is not selecting:
+a realization marketplace never turns a realization on for a workspace.
+
+#### What a realization marketplace must not contain
+
+- No Tier 1: no `skills/concept/`, and so no concept plugin. The concept
+  belongs to its defining marketplace.
+- No Tier 2: no `skills/realization-contract/`. The contract is the
+  defining marketplace's, referenced by `realizes`, never copied.
+- No default realization, and no marker of one. The default of a concept
+  is owned by its defining marketplace (see §4).
+
+#### Defaults and collisions
+
+The default of a concept is the one realization its defining marketplace
+marks (§4), and only that marketplace can mark one. A workspace's
+selection overrides the default for that workspace and never makes
+another realization "the default". A realization is identified by the
+pair (concept, realization name).
+
+| Case | Rule |
+|---|---|
+| The same realization name for different concepts | Not a collision. |
+| The same name for the same concept from two installed marketplaces | Ambiguous: a bare name cannot say which is meant. The workspace uses the qualified form `realization@marketplace`, whose qualifier is the marketplace that ships it. |
+| The same name in two plugins of one realization marketplace | Not allowed: within a marketplace, each (concept, realization name) is unique, so a qualified name resolves to exactly one source. |
+| A workspace-authored realization with the same name as an installed one | The workspace's own wins. It is not ambiguous and does not halt. |
+| A realization marketplace that wants to replace the default | Not possible by design. The workspace selects the realization explicitly. |
+
+Skills are namespaced by plugin, so a same-named skill never replaces
+another by itself
+([resolving skills that share a name](https://code.claude.com/docs/en/skills#resolve-skills-that-share-a-name)).
+"Wins" in the fourth row is the pattern's own order of
+resolution (workspace first, then installed realizations), not a Claude
+Code feature.
+
+A newly installed marketplace therefore cannot silently replace a working
+realization. If a bare name that was unique becomes ambiguous, the
+workspace qualifies it. Qualify the existing selection before installing a
+second marketplace that offers the same name.
+
+#### Version axes
+
+Two version numbers are involved, and each has one job.
+
+| Axis | Declared in | Compared by | Job |
+|---|---|---|---|
+| Plugin version range | The entry's `dependencies[].version` | Claude Code | Installation, and a guard against a MAJOR break in the concept plugin. It does not promise a contract version. A workspace-authored realization has no plugin version. |
+| `contractVersion` | Tier 2 `schema.json`; a range in each realization's `realizes` block | The activation check | Compatibility between a realization and the contract. It works the same for all three sources of realizations. |
+
+Rules for `contractVersion`:
+
+1. It is a plain `MAJOR.MINOR.PATCH` string, with no pre-release suffix.
+2. A realization declares a range, and is compatible when the installed
+   Tier 2 version satisfies it.
+3. A breaking change under the superset rule of §7 is a MAJOR bump: a new
+   required property or operation, or a narrowed, retyped, removed or
+   renamed required element. A new optional element is MINOR. A change
+   to descriptions only is PATCH.
+4. A plugin release that bumps `contractVersion` MAJOR should also bump
+   the plugin's own MAJOR, so the plugin range protects dependents as well.
+   This is guidance for the defining marketplace's author, not something
+   a tool checks.
+
 ### Consequences
 
 - Adding a new provider for an existing concept means adding one Tier 3
@@ -720,8 +926,3 @@ locally: a dependency entry that names a marketplace also matches a
   That's a deliberate trade: more plugins to browse, in exchange for
   every installed one staying small enough to reason about and swap
   freely.
-
-### Open questions (not yet decided)
-
-- Whether contract versioning uses semver strings compared by the
-  activation check, or a simpler compatible/incompatible flag.
