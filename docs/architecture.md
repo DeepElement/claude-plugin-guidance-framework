@@ -255,10 +255,11 @@ case, and only one level deep: `realize-<name>/` directly under
 (§10): a workspace may keep whatever else it likes elsewhere, and
 guidance does not look. A realization kept elsewhere is simply not a
 candidate the activation check will find, so a selection that names it is
-reported as stale (§6). `validate-concept-plugin` check B.4 says a
-workspace realization needs no particular path; that is about validating
-the skill's contents, which works wherever the skill is, and it does not
-make a skill outside this location visible to the activation check.
+reported as stale (§6). `validate-concept-plugin` check B4 reports a
+workspace-authored realization outside this location as an error, and B1
+does the same for a selected skill whose `realizes` block is missing or
+malformed, which the check cannot find either. It checks nothing else
+about where a workspace keeps its skills.
 
 A workspace-authored realization with the same name as an installed one
 wins; see "Defaults and collisions" in §10.
@@ -450,10 +451,11 @@ resolve, and it can change without this instruction text being updated
 to match. `validate-concept-plugin`'s cross-concept reference check
 (check C) scans for this pattern and runs proactively any time a Tier 1
 or Tier 3 file is authored or edited, not only on an explicit audit
-request — see that skill for the mechanical check. That skill's
-check C3 currently describes the bare backticked name as the only
-correct form and has not been updated for the qualified form, so it can
-report a qualified reference as a style finding (non-blocking).
+request — see that skill for the mechanical check. Its check C3 accepts
+the qualified form where the bare name is ambiguous, reports it as
+"unverified" where ambiguity could arise from plugins it cannot see, and
+reports any other departure from the table above as a non-blocking style
+finding.
 
 ### 6. Activation check: a shared convention, not a hook
 

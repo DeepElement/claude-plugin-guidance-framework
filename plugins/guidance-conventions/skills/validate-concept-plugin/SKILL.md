@@ -1,6 +1,6 @@
 ---
 name: validate-concept-plugin
-description: Validate that a plugin claiming to be a "Concept" plugin correctly follows the concept/realization architecture (Tier 1 concept, Tier 2 realization contract, Tier 3 realizations, default realization, activation-check invocation), validate a workspace-authored realization skill against a concept's published contract, check that concepts reference each other only by name in the required backtick-quoted form, validate the realization plugins of a realization marketplace against the published contract they target, and detect when a concept plugin has drifted into needing more than one realization contract (or is bundling more than one capability into Tier 1) and should be split into sibling concepts. Use proactively whenever the user is authoring or editing a plugin under plugins/*/skills/concept/, plugins/*/skills/realization-contract/, or plugins/*/skills/realize-*/ — this always includes scanning for leaked cross-concept references (check C), not just structural checks — whenever a consuming workspace is authoring its own realization skill for a published marketplace's concept, or whenever the user explicitly asks to check/validate/audit a concept plugin, a workspace realization, cross-concept references, or whether a plugin should be split.
+description: Validate that a plugin claiming to be a "Concept" plugin correctly follows the concept/realization architecture (Tier 1 concept, Tier 2 realization contract, Tier 3 realizations, default realization, activation-check invocation), validate a workspace-authored realization skill against a concept's published contract, check that concepts reference each other only by name in the required backtick-quoted form (qualified as `name@marketplace` only when the bare name is ambiguous), validate the realization plugins of a realization marketplace against the published contract they target, and detect when a concept plugin has drifted into needing more than one realization contract (or is bundling more than one capability into Tier 1) and should be split into sibling concepts. Use proactively whenever the user is authoring or editing a plugin under plugins/*/skills/concept/, plugins/*/skills/realization-contract/, or plugins/*/skills/realize-*/ — this always includes scanning for leaked cross-concept references (check C), not just structural checks — whenever a consuming workspace is authoring its own realization skill for a published marketplace's concept, or whenever the user explicitly asks to check/validate/audit a concept plugin, a workspace realization, cross-concept references, or whether a plugin should be split.
 ---
 
 # Validate Concept Plugin
@@ -29,16 +29,16 @@ what's being authored or what the user asks for:
   C (below) runs automatically as part of set A whenever a Tier 1 or
   Tier 3 file is authored or edited — it is not gated behind a separate
   audit request.
-- **B. A workspace-authored realization** — see "Validating a
-  workspace-authored realization" below, for a realization skill living
-  outside the marketplace under validation (e.g. in a consuming
-  workspace's own `.claude/skills/`) that claims to satisfy a concept
-  plugin's contract.
+- **B. A workspace-authored realization** — checks 1–4 in "Validating a
+  workspace-authored realization" below (referred to as B1–B4), for a
+  realization skill living outside the marketplace under validation
+  (e.g. in a consuming workspace's own `.claude/skills/`) that claims to
+  satisfy a concept plugin's contract.
 - **C. Cross-concept reference discipline** — see "Cross-concept
-  reference check" below, scanning any concept's Tier 1 or Tier 3 skill
-  for leaked coupling to a specific realization, and confirming any
-  correct reference uses the required backtick-quoted concept-name form
-  (architecture.md §5).
+  reference check" below (C1–C4), scanning any concept's Tier 1 or Tier 3
+  skill for leaked coupling to a specific realization, and confirming any
+  correct reference uses the required backtick-quoted concept-name form,
+  qualified only when the bare name is ambiguous (architecture.md §5).
 - **D. Split-signal check** — check 10 below, detecting when a concept
   plugin has outgrown the one-contract-per-concept rule and should be
   split into sibling concepts instead of accommodating a second contract
@@ -207,7 +207,8 @@ structure (see "Realization marketplaces (E)"):
      SKILL.md uses them, so that a change in the service can be absorbed
      from configuration. The rule is stated once, in
      [architecture.md §11](../../../../docs/architecture.md#rule-for-realization-authors);
-     this is the only place it is checked, and it is not part of the
+     this bullet is the single definition of the check, which B3 reuses
+     for a workspace-authored realization. It is not part of the
      Tier 2 check (check 3), because provider-specific fields belong in
      Tier 3. It is a judgment call. Pass: `schema.json` has a property
      whose name matches `endpoint|base_?url|api_?version`
@@ -281,25 +282,37 @@ structure (see "Realization marketplaces (E)"):
 ## Validating a workspace-authored realization (B)
 
 Per §2 of the architecture doc, a consuming workspace can author its own
-realization for a published marketplace's concept (e.g. in
-`.claude/skills/`, outside the marketplace under validation) instead of
-using one shipped by the defining marketplace. Use this check when the
-user is authoring such a skill, or asks to validate one.
+realization for a concept (in `.claude/skills/`, outside the marketplace
+under validation) instead of using one a marketplace offers. Use this
+check when the user is authoring such a skill, or asks to validate one.
+It applies to a skill that declares itself a realization of a concept (it
+carries a `realizes` block, or `marketplace-plugin-settings.yml` selects
+it). Any other skill a workspace keeps, including a local override of an
+installed plugin or skill, is outside what guidance validates: say B does
+not apply and stop.
 
-1. **Identify the target concept.** The workspace realization's SKILL.md
-   must declare which concept and contract version it satisfies (per §1
-   Tier 3 requirements). If it doesn't say, ask the user which concept
-   plugin it's meant to realize — do not guess.
+1. **B1. Identify the target concept.** The skill's `SKILL.md` declares
+   the concept and contract version it satisfies in the `realizes` block
+   ([architecture.md §10](../../../../docs/architecture.md#the-realizes-declaration),
+   required in a workspace-authored realization). Apply E2's rules to the
+   block. The activation check treats only a skill with a valid block as
+   a candidate realization, so a skill that
+   `marketplace-plugin-settings.yml` selects (a `realization:` field that
+   names it, by its directory name minus `realize-`) and that has a
+   missing or malformed block is **blocking**: the activation check
+   cannot find it. For a skill that is not selected, report a missing or
+   malformed block as non-blocking. If there is no block, ask the user
+   which concept plugin it is meant to realize; do not guess.
 
-2. **Locate that concept's contract.** Find the concept plugin's
+2. **B2. Locate that concept's contract.** Find the concept plugin's
    `skills/realization-contract/schema.json` and `SKILL.md` (in the
    marketplace under validation, or wherever the concept plugin is
    installed). If the concept plugin isn't available to inspect, report
    that this check can't complete and say what's needed (the concept
    plugin installed or its contract files provided).
 
-3. **Run the same checks as Tier 3 realizations in set A**, applied to
-   this workspace skill instead of a `skills/realize-<provider>/`
+3. **B3. Run the same checks as Tier 3 realizations in set A**, applied
+   to this workspace skill instead of a `skills/realize-<provider>/`
    directory:
    - it publishes its own `schema.json` (blocking if missing)
    - that `schema.json` is a valid superset of the concept's Tier 2
@@ -307,17 +320,37 @@ user is authoring such a skill, or asks to validate one.
    - every property has a `description` (non-blocking)
    - it invokes the activation check as its first instruction
      (non-blocking if present-but-not-first, blocking if entirely absent)
-   - its declared identifying name doesn't collide with the name of an
-     existing realization shipped by the defining marketplace for the
-     same concept unless it's intentionally meant to override/replace it
-     (ask the user if unclear)
+   - the A6 knob (non-blocking): if the skill talks to an external
+     service, it exposes and uses an endpoint and an API or tool version
+     property, as the [A6 knob](#checks-a-concept-plugin-structure) in
+     check 6 defines once
 
-4. **It does not need**: a matching directory name convention, a
-   `default: true` marker (workspace realizations are opted into via
+   Giving the skill the same name as a realization an installed
+   marketplace offers is not a finding: the workspace's own wins
+   ([architecture.md §10](../../../../docs/architecture.md#defaults-and-collisions)).
+   Do not flag it, and do not ask whether it was intended.
+
+4. **B4. Location.** A workspace-authored realization lives at
+   `.claude/skills/realize-<name>/` in the workspace root, directly under
+   `.claude/skills/`, with `SKILL.md` and a sibling `schema.json`
+   ([architecture.md §2](../../../../docs/architecture.md#where-a-workspace-authored-realization-lives)).
+   That is the location the activation check reads for the realization use
+   case; a realization kept elsewhere is not a candidate it can find.
+   - **Blocking:** the skill, which B covers because it carries a
+     `realizes` block or is selected in `marketplace-plugin-settings.yml`,
+     is not at that location (another directory, a nested subdirectory,
+     or a name that does not start with `realize-`). Name the required
+     path in the finding.
+   - **Non-blocking:** the directory carries a `.claude-plugin/plugin.json`.
+     That makes it a plugin rather than a workspace skill, which §2 says it
+     is not.
+
+   B4 is the only location rule, and where the workspace keeps anything
+   else is not checked. A workspace realization also needs no
+   `default: true` marker: it is opted into through
    `marketplace-plugin-settings.yml`'s `realization:` field, never as an
-   implicit default), or to live under any particular path — those A-set
-   rules are about the concept plugins of the marketplace under
-   validation specifically.
+   implicit default. The A-set rules on markers and naming are about the
+   concept plugins of the marketplace under validation.
 
 Report the same way as set A: blocking vs. non-blocking, file and fix
 suggestion per finding.
@@ -326,7 +359,8 @@ suggestion per finding.
 
 Per §5 of the architecture doc, one concept's instructions may reference
 another concept by name only — written as that concept's name in
-backticks (e.g. `` `secrets` ``), the required reference style — never a
+backticks (e.g. `` `secrets` ``), the required reference style, or as
+`` `name@marketplace` `` where the bare name is ambiguous — never a
 specific realization, and never assuming one is active. This check runs
 **proactively as part of set A**, automatically, any time a Tier 1
 (`skills/concept/SKILL.md`) or Tier 3 (`skills/realize-*/SKILL.md`) file
@@ -335,32 +369,66 @@ behind an explicit "audit cross-concept references" request, though a
 user can still ask for it standalone (e.g. to sweep the whole
 marketplace at once).
 
-1. **Scan for other concepts' realization names.** For each concept
+1. **C1. Scan for other concepts' realization names.** For each concept
    plugin found, collect the full set of realization identifying names
    registered by every *other* installed concept plugin (from their
-   `skills/realize-*/SKILL.md` files).
+   `skills/realize-*/SKILL.md` files), including those offered by a
+   realization marketplace and the workspace's own realizations when they
+   are on disk. A realization is also written qualified,
+   `realization@marketplace`; collect both forms.
 
-2. **Check for leaked references.** Search this concept's `skills/concept/`
+2. **C2. Check for leaked references.** Search this concept's `skills/concept/`
    and `skills/realize-*/` files for any of those other concepts'
    realization names appearing in the instruction text. A reference to
    another concept by its **concept name** (e.g. "use the `secrets`
    concept") is correct and expected — flag only references to a
    specific *realization* of another concept (e.g. "use
-   `aws-secrets-manager`" instead of "use the `secrets` concept").
+   `aws-secrets-manager`" instead of "use the `secrets` concept"). A
+   qualified form such as `aws-secrets-manager@acme-aws-realizations` is a
+   realization reference, and is flagged the same way; the qualifier does
+   not make it a concept reference.
 
-3. **Check the reference is in the required style.** Even when a
-   reference correctly names the concept and not a realization, flag
-   (non-blocking) one that doesn't backtick-quote the bare concept name
-   (e.g. prose like "use the secrets capability" or "use Secrets" instead
-   of "use the `secrets` concept") — per architecture.md §5, the
-   backtick-quoted concept name is the required, sole form a
-   cross-concept reference takes, precisely so it reads unambiguously as
-   a reference to a term defined elsewhere (that concept's own Tier 1)
-   rather than as ordinary prose. This is a mechanical, low-risk check
-   (unlike check 2's judgment call on leaked realization names) — a
-   correct-but-unquoted reference is a style fix, not a coupling problem.
+3. **C3. Check the reference is in the required style.** Even when a
+   reference correctly names the concept and not a realization, check
+   (non-blocking) its form against
+   [architecture.md §5](../../../../docs/architecture.md#5-cross-concept-references-stay-abstract):
+   - **Bare, backticked** (`` `secrets` ``) is the default and is correct
+     whenever the bare name is unique among the concepts you can see. Flag
+     prose like "use the secrets capability" or "use Secrets" instead of
+     "use the `secrets` concept", which reads as ordinary prose rather
+     than as a reference to a term defined elsewhere (that concept's own
+     Tier 1).
+   - **Qualified, backticked** (`` `secrets@acme-concepts` ``) is accepted
+     only when two concepts share the bare name. The qualifier must be the
+     defining marketplace's `name` of the concept meant. Flag one whose
+     qualifier is not the marketplace that defines a concept of that name.
+     For a qualified reference whose bare name is unique among the
+     concepts you can see, §5 judges ambiguity over everything a teammate
+     may have enabled, so qualifying is not wrong in itself. If any
+     source of concept plugins could not be read (a declared dependency's
+     marketplace or an enabled plugin that is not on disk, or a settings
+     scope you could not read), report it as "unverified" and name what
+     could not be read, not as a style finding. Report the finding ("not
+     ambiguous in everything visible; use the bare name") only when every
+     source you could enumerate was read and the bare name is unique
+     across all of them, and still say what you could not see.
+   - **Bare, but ambiguous.** Flag a bare reference when two concepts
+     share the name and the binding rule in §5 does not settle it (inside
+     a plugin's own text, the plugin's own marketplace first, then the
+     marketplaces it declares dependencies on); say which qualified forms
+     would disambiguate.
 
-4. **Check for hardcoded assumptions.** Flag (non-blocking) any
+   Judge ambiguity over the concept plugins you can see: those of the
+   marketplace under validation, those of the marketplaces it declares
+   dependencies on that are on disk, and, when validating a workspace,
+   those enabled in its settings. Say which of those you could not read.
+   When you cannot tell whether a name is ambiguous, report the form
+   check as "unverified" rather than as a finding. This is a mechanical,
+   low-risk check (unlike check 2's judgment call on leaked realization
+   names): a correct-but-unquoted reference is a style fix, not a coupling
+   problem.
+
+4. **C4. Check for hardcoded assumptions.** Flag (non-blocking) any
    instruction phrased as though a particular realization is always
    active for another concept (e.g. "since this uses AWS, assume the
    region config is set") rather than resolving it generically through
@@ -371,8 +439,9 @@ findings as suggestions to review, not certainties, since
 natural-language text can mention a provider name for reasons unrelated
 to a hard dependency (e.g. a comparison in documentation). Always show
 the matched text so the user can judge intent. Check 3 is closer to
-mechanical (does the reference use backticks around the bare concept
-name, yes or no) and can be reported more confidently.
+mechanical (does the reference use backticks around the concept name,
+and is the form the one its ambiguity calls for) and can be reported more
+confidently, except where ambiguity could not be determined.
 
 ## Realization marketplaces (E)
 
@@ -451,7 +520,10 @@ Otherwise, group findings within each set as:
   multiple default realizations among plugins that have ≥1 realization
   (set A only — not applicable to a workspace-authored realization or
   to a concept-only plugin), a realization/workspace skill missing the
-  activation-check invocation entirely, and any set-E failure (E1, E2,
+  activation-check invocation entirely, a workspace-authored realization
+  that is not at the location B4 defines, a workspace skill selected in
+  `marketplace-plugin-settings.yml` whose `realizes` block is missing or
+  malformed (B1), and any set-E failure (E1, E2,
   E3 other than "unverified", E4, E5). These mean the plugin/skill
   cannot be used as documented, or silently breaks the contract, and
   should be fixed before merging/publishing/using it.
@@ -465,7 +537,12 @@ Otherwise, group findings within each set as:
   non-abstract failure modes, or a bundled/incoherent operations group
   (check 1's breadth heuristic) in Tier 1, any set-C cross-concept
   reference finding (leaked realization name, unquoted reference style,
-  or hardcoded realization assumption), and any set-D split-signal
+  a qualified reference with the wrong qualifier or whose bare name is
+  unique in every source you could read, an ambiguous bare reference, or
+  hardcoded realization assumption), a malformed or missing `realizes`
+  block in a workspace skill that is not selected (B1) or a
+  `.claude-plugin/plugin.json` in a workspace realization's directory
+  (B4), a qualified reference reported "unverified" (C3), and any set-D split-signal
   finding (all always non-blocking — they're evidence-based judgment
   calls for the user to weigh, never certainties), the A6 knob finding
   (also a judgment call), and an E3 "unverified" or an A6 superset
