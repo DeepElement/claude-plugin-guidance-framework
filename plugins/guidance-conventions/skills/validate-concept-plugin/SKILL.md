@@ -1,13 +1,13 @@
 ---
 name: validate-concept-plugin
-description: Validate that a plugin claiming to be a "Concept" plugin correctly follows the concept/realization architecture (Tier 1 concept, Tier 2 realization contract, Tier 3 realizations, default realization, activation-check invocation), validate a workspace-authored realization skill against a concept's published contract, check that concepts reference each other only by name in the required backtick-quoted form, and detect when a concept plugin has drifted into needing more than one realization contract (or is bundling more than one capability into Tier 1) and should be split into sibling concepts. Use proactively whenever the user is authoring or editing a plugin under plugins/*/skills/concept/, plugins/*/skills/realization-contract/, or plugins/*/skills/realize-*/ — this always includes scanning for leaked cross-concept references (check C), not just structural checks — whenever a consuming workspace is authoring its own realization skill for a published marketplace's concept, or whenever the user explicitly asks to check/validate/audit a concept plugin, a workspace realization, cross-concept references, or whether a plugin should be split.
+description: Validate that a plugin claiming to be a "Concept" plugin correctly follows the concept/realization architecture (Tier 1 concept, Tier 2 realization contract, Tier 3 realizations, default realization, activation-check invocation), validate a workspace-authored realization skill against a concept's published contract, check that concepts reference each other only by name in the required backtick-quoted form, validate the realization plugins of a realization marketplace against the published contract they target, and detect when a concept plugin has drifted into needing more than one realization contract (or is bundling more than one capability into Tier 1) and should be split into sibling concepts. Use proactively whenever the user is authoring or editing a plugin under plugins/*/skills/concept/, plugins/*/skills/realization-contract/, or plugins/*/skills/realize-*/ — this always includes scanning for leaked cross-concept references (check C), not just structural checks — whenever a consuming workspace is authoring its own realization skill for a published marketplace's concept, or whenever the user explicitly asks to check/validate/audit a concept plugin, a workspace realization, cross-concept references, or whether a plugin should be split.
 ---
 
 # Validate Concept Plugin
 
-Checks the concept plugins of a published marketplace, and
-workspace-authored realizations of them, against the concept/realization
-architecture described in
+Checks the concept plugins of a published marketplace, the realization
+plugins of a realization marketplace, and workspace-authored
+realizations, against the concept/realization architecture described in
 [docs/architecture.md](../../../../docs/architecture.md). Read that
 document first if you haven't already — this skill enforces it, it
 doesn't restate it.
@@ -18,12 +18,14 @@ a plugin adopt this structure — only that a plugin or realization which
 *has* adopted it (see "How to detect a Concept plugin" below) does so
 correctly.
 
-This skill covers four distinct checks, run independently depending on
+This skill covers five distinct checks, run independently depending on
 what's being authored or what the user asks for:
 
-- **A. Concept plugin structure** — checks 1–9 below, for a concept
-  plugin of a published marketplace, living in the `plugins/` tree of the
-  marketplace under validation. Check
+- **A. Concept plugin structure** — checks 1–9 below (referred to as
+  A1–A9), for a concept plugin of a published marketplace, living in the
+  `plugins/` tree of the marketplace under validation. Several of them
+  also apply to a realization plugin; see "Realization marketplaces
+  (E)". Check
   C (below) runs automatically as part of set A whenever a Tier 1 or
   Tier 3 file is authored or edited — it is not gated behind a separate
   audit request.
@@ -41,25 +43,59 @@ what's being authored or what the user asks for:
   plugin has outgrown the one-contract-per-concept rule and should be
   split into sibling concepts instead of accommodating a second contract
   shape in place.
+- **E. Realization marketplace** — see "Realization marketplaces (E)"
+  below, for the realization plugins of a realization marketplace: a
+  marketplace that offers realizations (Tier 3 only) for concepts a
+  published marketplace defines
+  ([architecture.md §10](../../../../docs/architecture.md#10-realization-marketplaces)).
 
-## How to detect a Concept plugin
+## How to classify a marketplace and detect a Concept plugin
+
+Classify the marketplace under validation first. Classification is
+structural, per marketplace, and reads only the plugins whose entry has a
+relative-path source (see `validate-marketplace` M1 for which entries
+that is; say which entries you could not read):
+
+- **Published marketplace** — at least one plugin has a
+  `skills/concept/` directory. Sets A, C and D apply.
+- **Realization marketplace** — at least one plugin has a
+  `skills/realize-*/` directory and no plugin has `skills/concept/`.
+  Set E applies, with the applicability of sets A, C and D given under
+  "Realization marketplaces (E)".
+- **Anything else** — outside this model. Say so and skip every check
+  below.
+
+A marketplace that mixes concept plugins with realization-only plugins is
+classified as published; `validate-marketplace` reports the mix once
+under AD3. If the marketplace root (the directory with
+`.claude-plugin/marketplace.json`) cannot be found, for example when the
+user points at one plugin directory, say that the marketplace cannot be
+classified and detect from the plugin alone, as follows.
 
 A plugin is a Concept plugin if it has a
 `skills/concept/SKILL.md` file. Presence of that file is the sole
 signal — no `plugin.json` field is required to opt in, and neither is
 having any realization-contract or realization yet (see check 4: a
 Concept plugin may legitimately have `skills/concept/` and nothing
-else). If a plugin has `skills/realization-contract/` or
-`skills/realize-*/` but no `skills/concept/`, flag that on its own (see
-check 1) rather than assuming intent.
+else). If a plugin in a published marketplace has
+`skills/realization-contract/` or `skills/realize-*/` but no
+`skills/concept/`, flag that on its own (see check 1) rather than
+assuming intent. In a realization marketplace, a plugin with
+`skills/realize-*/` and no `skills/concept/` is the expected shape and is
+checked by set E, not flagged here.
 
 If a plugin has none of `skills/concept/`, `skills/realization-contract/`,
 or `skills/realize-*/`, it's a plain plugin — skip all checks below and
-say so.
+say so. (In a realization marketplace such a plugin is not skipped: E1
+flags it.)
 
 ## Checks (A: concept plugin structure)
 
-For each Concept plugin found (or the one specified by the user):
+For each Concept plugin found (or the one specified by the user). Checks
+4 and 5 count and mark realizations among the realizations of a concept
+plugin, so they apply only to a plugin that has `skills/concept/`; a
+realization plugin of a realization marketplace has none of that
+structure (see "Realization marketplaces (E)"):
 
 1. **Tier 1 present and abstract.** `skills/concept/SKILL.md` exists and
    its content describes the capability without naming a specific
@@ -165,6 +201,21 @@ For each Concept plugin found (or the one specified by the user):
      binding to a preexisting MCP/CLI is the recommended first move, so
      an unexplained direct integration is worth flagging for the user
      to confirm was intentional
+   - **A6 knob (resilience rule).** A realization that talks to an
+     external service exposes an endpoint (base URL) and an API or tool
+     version as optional properties in its `schema.json`, and its
+     SKILL.md uses them, so that a change in the service can be absorbed
+     from configuration. The rule is stated once, in
+     [architecture.md §11](../../../../docs/architecture.md#rule-for-realization-authors);
+     this is the only place it is checked, and it is not part of the
+     Tier 2 check (check 3), because provider-specific fields belong in
+     Tier 3. It is a judgment call. Pass: `schema.json` has a property
+     whose name matches `endpoint|base_?url|api_?version`
+     (case-insensitive) and the realization's SKILL.md refers to it, or
+     SKILL.md says why no such property applies (for example, the
+     realization calls no external service). Fail: neither. Report the
+     finding as non-blocking, and name the properties you found, if any,
+     that SKILL.md does not use.
 
 7. **Realization naming matches provider, not concept.** Flag
    (non-blocking) any `skills/realize-<provider>/` whose name is generic
@@ -323,9 +374,65 @@ the matched text so the user can judge intent. Check 3 is closer to
 mechanical (does the reference use backticks around the bare concept
 name, yes or no) and can be reported more confidently.
 
+## Realization marketplaces (E)
+
+Run set E only on a marketplace classified as a realization marketplace
+(see "How to classify a marketplace and detect a Concept plugin"); on any
+other marketplace say it does not apply. A realization marketplace
+contains realization plugins and nothing that defines a concept. What it
+may contain, how it targets a contract and how it declares its
+dependency are in
+[architecture.md §10](../../../../docs/architecture.md#10-realization-marketplaces);
+this section only checks them, and does not restate them.
+
+**Applicability for a realization plugin.** Each plugin is checked on its
+own, and what runs is:
+
+| Check | Realization plugin |
+|---|---|
+| A1–A3 (Tier 1, Tier 2) | Skipped: the plugin has neither (E1 requires that). |
+| A4, A5 (realization count, default) | Skipped: they are scoped to a plugin that has `skills/concept/`. E5 replaces A5. |
+| A6 (valid, superset `schema.json`, and the A6 knob) | Runs. The superset comparison is made against the Tier 2 `schema.json` of the defining plugin, resolved through E3, when that plugin is on disk; otherwise report the superset comparison as "unverified" (non-blocking) and run the rest of A6 locally. The A6 sub-check on stating default status does not apply, because the realization is never the default. |
+| A7, A9 (naming) | Run locally. For A9, the naming convention comes from the resolved Tier 2 when it is on disk, and otherwise is the directory name minus `realize-`. |
+| A8 (activation check first) | Applies, as written in check 8. |
+| C (cross-concept references) | Runs as written on the `realize-*` files. |
+| D (split signal) | Does not apply: it judges whether a concept's contract needs splitting, and a realization marketplace holds no Tier 1 or Tier 2. |
+
+Set E reads each realization's declaration, a fenced `realizes` block in
+its `SKILL.md` (architecture.md §10, "The `realizes` declaration"). The
+dependency declarations themselves (object form, placement in the
+marketplace entry, allowlist) are checked by `validate-marketplace`
+set U, not repeated here.
+
+| Id | Pass | Fail | Severity |
+|---|---|---|---|
+| **E1** Shape | Every plugin has at least one `skills/realize-*/` and has neither `skills/concept/` nor `skills/realization-contract/` | A plugin with a Tier 2 contract, a Tier 1 skill, or no `skills/realize-*/` | Blocking |
+| **E2** `realizes` block | Each `skills/realize-*/SKILL.md` has the `realizes` fenced block; `concept` is `<concept>@<marketplace>` (both parts present); `contractVersion` is a semantic-version range, written as in a dependency's [`version` field](https://code.claude.com/docs/en/plugins/dependencies#declare-a-dependency-with-a-version-constraint), with no pre-release suffix; every skill in the plugin names the same `concept` | A skill with no block, a `concept` with no qualifier, a `contractVersion` that is missing, not a valid range or has a pre-release suffix, or skills in one plugin that name different concepts | Blocking |
+| **E3** Defining plugin | The marketplace entry's dependency whose `marketplace` equals the `concept` qualifier is a plugin whose concept name matches the `concept` in the block, and which has a Tier 2 (`skills/realization-contract/`) | No entry dependency on that marketplace, a dependency whose derived concept name differs from the block's, or (when the defining plugin is on disk) a defining plugin with no Tier 2, reported as "no contract to realize" | Blocking |
+| | | The defining plugin is not on disk, so its Tier 2 cannot be looked for ("unverified") | Non-blocking |
+| **E4** Unique names | Each pair (concept, realization name) occurs once in the marketplace; a realization name is its directory name minus `realize-` | Two skills, in one plugin or two, with the same pair | Blocking |
+| **E5** Never default | No realization carries a default marker | A realization carries one: `default: true` in its frontmatter, an explicit statement that it is the default, or the marker the resolved Tier 2 names (check 5) | Blocking |
+
+For E3 the concept name is the defining plugin's name without its prefix,
+the first hyphen-delimited segment, as `validate-marketplace` M2 defines
+it (`secrets` for `acme-secrets`); it is read from the entry, so it needs
+no copy on disk. Only the Tier 2 lookup does. The defining plugin is on disk when
+the user gives you the defining marketplace's directory, or when Claude
+Code has a local copy of it; read the copy exactly as `validate-marketplace`
+describes for set AD ([how a marketplace is found on disk](../validate-marketplace/SKILL.md#additive-only-chains-set-ad)),
+and use it only if its `marketplace.json` `name` equals the qualifier.
+Do not fetch it. E3 compares names and looks for a Tier 2; it does not
+compare `contractVersion` against the declared range, because Claude Code
+and the activation check own version resolution.
+
+Set E is blocking, unlike the sets that report on declarations an
+existing marketplace may already have made, because it only ever runs on
+a marketplace of the new project type: no marketplace that passes today
+can start failing because of it.
+
 ## Reporting
 
-State which check set(s) ran (A, B, C, D, or a combination) before
+State which check set(s) ran (A, B, C, D, E, or a combination) before
 listing findings, so the user knows what was and wasn't covered.
 
 If check 4 found zero realizations and no `skills/realization-contract/`,
@@ -344,7 +451,8 @@ Otherwise, group findings within each set as:
   multiple default realizations among plugins that have ≥1 realization
   (set A only — not applicable to a workspace-authored realization or
   to a concept-only plugin), a realization/workspace skill missing the
-  activation-check invocation entirely. These mean the plugin/skill
+  activation-check invocation entirely, and any set-E failure (E1, E2,
+  E3 other than "unverified", E4, E5). These mean the plugin/skill
   cannot be used as documented, or silently breaks the contract, and
   should be fixed before merging/publishing/using it.
 - **Non-blocking** — a `skills/realization-contract/` published with
@@ -359,7 +467,10 @@ Otherwise, group findings within each set as:
   reference finding (leaked realization name, unquoted reference style,
   or hardcoded realization assumption), and any set-D split-signal
   finding (all always non-blocking — they're evidence-based judgment
-  calls for the user to weigh, never certainties). These degrade the
+  calls for the user to weigh, never certainties), the A6 knob finding
+  (also a judgment call), and an E3 "unverified" or an A6 superset
+  comparison reported "unverified" because the defining plugin is not on
+  disk. These degrade the
   guarantees the architecture doc promises (clear config errors,
   swappability, self-explanatory config, loose coupling, one contract
   per concept) but don't make the plugin unusable outright.

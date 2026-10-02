@@ -86,7 +86,11 @@ of the form `name@marketplace`
 ([dependency entry forms](https://code.claude.com/docs/en/plugins/dependencies#declare-a-dependency-with-a-version-constraint)). This skill reads the declarations only. An
 invalid range, an unregistered marketplace or a missing release tag is
 reported by Claude Code when the dependency is resolved, so do not
-re-implement those checks, and do not parse version ranges. For the
+re-implement those checks, and do not parse version ranges. Set U also
+runs on a realization marketplace, whose entries depend on the plugin that
+defines the concept it realizes; there the defining marketplace is a
+depended-on marketplace, not an upstream one (upstream and downstream
+name only a relation between published marketplaces). For the
 recommended way to write these declarations, link
 [architecture.md §9](../../../../docs/architecture.md#9-chains-of-published-marketplaces)
 rather than restating it.
@@ -123,7 +127,8 @@ mixed prefixes, take each plugin's concept name from its own first segment.
 | **AD1** Unique concept names | Each concept name is defined by one plugin in the marketplace under validation | Two plugins define the same concept name (for example `acme-secrets` and `beacon-secrets`) | Warning |
 | **AD2** No overlap with an upstream | No plugin name, concept name or prefix of the marketplace under validation equals one of an upstream published marketplace's whose copy is on disk | An overlap, naming both plugins and the shared name or prefix | Warning |
 | | | An upstream published marketplace named by an entry dependency is not on disk, so overlap cannot be checked ("unverified") | Warning |
-| **AD3** Realizations stay with their concept | Every plugin with a `skills/realize-*/` skill also has its own `skills/concept/` | A plugin has realizations and no `skills/concept/` of its own (a realization-only plugin) | Warning |
+| **AD3** Realizations stay with their concept | Every plugin with a `skills/realize-*/` skill also has its own `skills/concept/`, and every `realizes` block in the marketplace under validation names a concept it defines | A plugin has realizations and no `skills/concept/` of its own (a realization-only plugin) | Warning |
+| | | A `realizes` block whose qualifier is not the `name` of the marketplace under validation, or whose concept name is not the concept name of any of its concept plugins | Warning |
 
 For AD2, an upstream published marketplace is a marketplace named in an
 entry's cross-marketplace dependency, other than the guidance marketplace,
@@ -139,21 +144,32 @@ fails AD2 on the downstream's next run, if the upstream is on disk then; a
 prefix of the downstream's own, distinct from the upstream's, is what
 prevents it.
 
-AD3 reports a realization-only plugin because a published marketplace has
-no way to provide realizations for another published marketplace's concept;
-its realizations stay with the concept plugin that defines it. A plugin
-that has `skills/concept/` and `skills/realize-*/` but no
+AD3 reports a realization-only plugin, and a `realizes` block that names a
+concept the marketplace does not define, because a published marketplace
+has no way to provide realizations for another published marketplace's
+concept; its realizations stay with the concept plugin that defines it. A
+`realizes` block is the fenced block described in
+[architecture.md §10](../../../../docs/architecture.md#the-realizes-declaration)
+(a concept plugin's own realizations need not carry one, so a missing
+block is not an AD3 finding), and its `concept` is `<concept>@<marketplace>`.
+A marketplace that mixes concept plugins with realization-only plugins is
+classified as published (see `validate-concept-plugin`, "How to classify a
+marketplace and detect a Concept plugin"), and AD3 reports that mix once,
+naming every realization-only plugin, with the message "belongs in a
+realization marketplace
+([architecture.md §10](../../../../docs/architecture.md#10-realization-marketplaces))".
+A plugin that has `skills/concept/` and `skills/realize-*/` but no
 `skills/realization-contract/` is reported by `validate-concept-plugin`
 check 2, not here.
 
-`validate-concept-plugin` already reports a plugin that has
-`skills/realization-contract/` or `skills/realize-*/` but no
-`skills/concept/` under its check 1, in any marketplace and not marked
-non-blocking there. AD3 reports the same realization-only case only where
-set AD runs (a marketplace with at least one `skills/concept/SKILL.md`),
-and as a warning. AD3 does not change or downgrade check 1: when both
-skills run, the check 1 finding keeps its own severity, and AD3 is the
-marketplace-level view of it.
+`validate-concept-plugin` reports, in a published marketplace, a plugin
+that has `skills/realization-contract/` or `skills/realize-*/` but no
+`skills/concept/` under its check 1, not marked non-blocking there. AD3
+reports the realization-only case for the marketplace as a whole, as a
+warning. AD3 does not change or downgrade check 1: when both skills run,
+the check 1 finding keeps its own severity, and AD3 is the
+marketplace-level view of it. In a realization marketplace that same shape
+is the expected one, and `validate-concept-plugin` checks it with set E.
 
 **Severity.** U and AD findings are warnings; report them and do not treat
 them as failing the validation.
@@ -167,7 +183,11 @@ them as failing the validation.
    `.claude-plugin/plugin.json`.
 4. Run checks 1–5 above (M1–M5). Then run set U if the marketplace has a
    cross-marketplace dependency or an allowlist, and set AD if it is a
-   published marketplace; say which sets you skipped and why.
+   published marketplace; say which sets you skipped and why. A
+   realization marketplace (see `validate-concept-plugin`, "How to
+   classify a marketplace and detect a Concept plugin") has no concept
+   plugin, so set AD does not apply to it; its own checks are set E in
+   `validate-concept-plugin`.
 5. Report findings grouped as **Schema issues** (point to official docs)
    vs. **Convention issues** (the guidance marketplace's own opinions),
    each with the file and a one-line fix suggestion. Name each finding's
