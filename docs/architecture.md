@@ -1020,14 +1020,36 @@ When `guidance-activation-check` is missing or disabled, a realization
 cannot run its first instruction. Each realization therefore says what to
 do then (§7, Tier 3).
 
-`validate-concept-plugin` check A8 treats the activation check as "if
-installed": it notes a missing `guidance-activation-check` once for the
-marketplace under validation and does not fail each realization for it.
-That stays non-blocking in this stack, and no tool yet requires the entry
-dependency (`validate-marketplace` set U checks the form, allowlist and
-README of whichever dependencies are declared). Making A8 require it is a
-separate, later change, so a realization plugin without the declaration is
-not rejected today; it just has no declared way to get the check.
+`validate-concept-plugin` check A8 requires the declaration. Every plugin
+with a `skills/realize-*/`, whether in a realization marketplace or a
+concept plugin that ships realizations of its own, must declare
+`guidance-activation-check` on its marketplace entry, in the object form
+with a `marketplace` and a `version`, and the root must allowlist
+`claude-plugin-guidance`; a missing declaration or allowlist entry is
+blocking. A8 reads the declarations only, and `validate-marketplace` set U
+still checks the range's form and the README section. A workspace-authored
+realization is not a plugin and has nothing to declare (§2).
+
+#### Migrating a realization plugin that lacks the declaration
+
+The first `guidance-conventions` release in which A8 blocks makes a
+realization plugin written against an earlier one fail it until its
+author:
+
+1. Adds the `guidance-activation-check` dependency to the plugin's entry
+   in `marketplace.json`, in the form shown above, with a range such as
+   `^1.0.0`.
+2. Adds `claude-plugin-guidance` to the root's
+   `allowCrossMarketplaceDependenciesOn`, and the matching row to the
+   README's `## Required marketplaces` section.
+
+3. Bumps the plugin's own version as the
+   [upstream duty](#authoring-recipe-published-marketplace-b-with-upstream-a)
+   says: a dependency on a marketplace it did not require before is a
+   MAJOR bump.
+
+The consuming workspace then registers the guidance marketplace, under a
+key equal to its `name`, as described above; nothing else changes for it.
 
 #### What a realization marketplace must not contain
 

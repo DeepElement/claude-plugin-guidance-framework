@@ -223,17 +223,36 @@ structure (see "Realization marketplaces (E)"):
    or repeats the concept name (e.g. `realize-default`) rather than
    naming the actual provider/technology it implements.
 
-8. **Every realization invokes the activation check first.** Each
-   realization's SKILL.md instructs Claude to run the activation check
-   (from `guidance-activation-check`, if installed) before doing any real
-   work, so missing/stale workspace configuration is caught with a clear
-   message rather than failing inside the realization. Flag (blocking)
-   any realization missing this step entirely; flag (non-blocking) one
-   where the invocation is present but not the literal first instruction
-   (e.g. operational steps precede it). If `guidance-activation-check`
-   isn't installed for the marketplace under validation yet, note that as
-   a separate, marketplace-wide gap rather than failing every realization
-   individually.
+8. **Every realization invokes the activation check first, and its
+   plugin declares the dependency.** Two parts.
+   - *Invocation.* Each realization's SKILL.md instructs Claude to run
+     the activation check (from `guidance-activation-check`) before doing
+     any real work, so missing/stale workspace configuration is caught
+     with a clear message rather than failing inside the realization.
+     Flag (blocking) any realization missing this step entirely; flag
+     (non-blocking) one where the invocation is present but not the
+     literal first instruction (e.g. operational steps precede it).
+   - *Declared dependency.* Each plugin in the marketplace under
+     validation that has a `skills/realize-*/` (a realization plugin, or
+     a concept plugin that ships realizations of its own) declares
+     `guidance-activation-check` on its entry in `marketplace.json`, as an
+     object with `marketplace` set to `claude-plugin-guidance` and a
+     `version`, and the root's `allowCrossMarketplaceDependenciesOn` lists
+     `claude-plugin-guidance`
+     ([architecture.md §10](../../../../docs/architecture.md#dependency-allowlist-and-readme)).
+     Flag (blocking), once per plugin, a plugin whose entry has no such
+     dependency, naming what is wrong: the dependency is absent, is
+     written in string form, has no `marketplace` or `version`, or is
+     declared only in `plugin.json`. Flag (blocking), once for the
+     marketplace, a root with no allowlist entry for
+     `claude-plugin-guidance`. This part reads the declarations only: it
+     does not parse the range (set U2 in `validate-marketplace` reports
+     an open-ended one) and does not check the README (U4). If the
+     marketplace root cannot be found, or a plugin's entry cannot be
+     read, report that plugin's declaration as "unverified"
+     (non-blocking) and say why. A workspace-authored realization is not
+     a plugin and has no dependency to declare, so this part does not
+     apply to set B.
 
 9. **Naming consistency.** The realization identifying names used in each
    `skills/realize-*/SKILL.md` are unique within the plugin and match
@@ -463,7 +482,7 @@ own, and what runs is:
 | A4, A5 (realization count, default) | Skipped: they are scoped to a plugin that has `skills/concept/`. E5 replaces A5. |
 | A6 (valid, superset `schema.json`, and the A6 knob) | Runs. The superset comparison is made against the Tier 2 `schema.json` of the defining plugin, resolved through E3, when that plugin is on disk; otherwise report the superset comparison as "unverified" (non-blocking) and run the rest of A6 locally. The A6 sub-check on stating default status does not apply, because the realization is never the default. |
 | A7, A9 (naming) | Run locally. For A9, the naming convention comes from the resolved Tier 2 when it is on disk, and otherwise is the directory name minus `realize-`. |
-| A8 (activation check first) | Applies, as written in check 8. |
+| A8 (activation check first, dependency declared) | Applies, as written in check 8: both the invocation and the declared dependency. |
 | C (cross-concept references) | Runs as written on the `realize-*` files. |
 | D (split signal) | Does not apply: it judges whether a concept's contract needs splitting, and a realization marketplace holds no Tier 1 or Tier 2. |
 
@@ -520,8 +539,11 @@ Otherwise, group findings within each set as:
   multiple default realizations among plugins that have ≥1 realization
   (set A only — not applicable to a workspace-authored realization or
   to a concept-only plugin), a realization/workspace skill missing the
-  activation-check invocation entirely, a workspace-authored realization
-  that is not at the location B4 defines, a workspace skill selected in
+  activation-check invocation entirely, a plugin with realizations whose
+  marketplace entry does not declare `guidance-activation-check` (or whose
+  root does not allowlist `claude-plugin-guidance`; A8), a
+  workspace-authored realization that is not at the location B4 defines,
+  a workspace skill selected in
   `marketplace-plugin-settings.yml` whose `realizes` block is missing or
   malformed (B1), and any set-E failure (E1, E2,
   E3 other than "unverified", E4, E5). These mean the plugin/skill
@@ -547,7 +569,8 @@ Otherwise, group findings within each set as:
   calls for the user to weigh, never certainties), the A6 knob finding
   (also a judgment call), and an E3 "unverified" or an A6 superset
   comparison reported "unverified" because the defining plugin is not on
-  disk. These degrade the
+  disk, and an A8 declared dependency reported "unverified" because the
+  marketplace entry could not be read. These degrade the
   guarantees the architecture doc promises (clear config errors,
   swappability, self-explanatory config, loose coupling, one contract
   per concept) but don't make the plugin unusable outright.

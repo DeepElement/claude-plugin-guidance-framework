@@ -111,6 +111,15 @@ The README section is the author's own statement and nothing verifies a
 registration source, so U4 checks that the section exists and agrees with
 the manifest, not that a source is correct.
 
+One declaration is also required, not only checked for form: a plugin
+with a `skills/realize-*/` must declare `guidance-activation-check` on its
+entry, and the root must allowlist `claude-plugin-guidance`. That is check
+A8 in `validate-concept-plugin`, which reports it as blocking. When both
+skills run, report a missing or malformed declaration of that one
+dependency, and a missing allowlist entry for its marketplace, under A8
+only, and do not repeat it as a U1, U2 or U3 warning. U4 and an open-ended
+range (U2) are still reported here.
+
 ## Additive-only chains (set AD)
 
 Run set AD only on a published marketplace, that is, one in which at least
