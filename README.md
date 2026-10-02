@@ -21,11 +21,18 @@ The guidance marketplace is that missing authoring toolkit. Install its
 plugins into your marketplace repo and they'll guide you toward good
 structure as you write it, and give you a clear, specific notice when
 something's off — instead of leaving you to remember the rules yourself.
-It is **not** a general-purpose plugin collection, and it's not meant to
-be installed into an ordinary application workspace — it's for the
-marketplace author building the marketplace repo itself (a
-`.claude-plugin/marketplace.json` plus a `plugins/` directory),
-authored so its checks run *as you write*, not after.
+It is **not** a general-purpose plugin collection. Two roles use it, for
+different reasons:
+
+- **Published and realization marketplace authors** install its
+  authoring tooling into the marketplace repo they are building (a
+  `.claude-plugin/marketplace.json` plus a `plugins/` directory),
+  authored so its checks run *as you write*, not after.
+- **A consuming workspace** registers it so the activation check can run
+  before a realization does real work. That is a runtime dependency of
+  using concept plugins, not authoring; the
+  [architecture](./docs/architecture.md#6-activation-check-a-shared-convention-not-a-hook)
+  says what the check does and does not do.
 
 ## Four roles
 
@@ -35,21 +42,22 @@ one.
 
 | Role | What it is |
 |---|---|
-| **guidance marketplace** | This repo (`claude-plugin-guidance`): authoring tooling for marketplace authors. It ships no concept plugins. |
+| **guidance marketplace** | This repo (`claude-plugin-guidance`): authoring tooling for marketplace authors, and the marketplace a consuming workspace registers so the activation check can run. It ships no concept plugins. |
 | **published marketplace** | A marketplace authored with the guidance marketplace that publishes concept plugins. |
 | **[realization marketplace](./docs/architecture.md#10-realization-marketplaces)** | A marketplace that offers realizations for concepts owned by an existing published marketplace. |
-| **consuming workspace** | The workspace that registers and uses marketplaces, and selects and configures realizations in `marketplace-plugin-settings.yml`. |
+| **consuming workspace** | The workspace that registers and uses marketplaces, the guidance marketplace among them, and selects and configures realizations in `marketplace-plugin-settings.yml`. |
 
 "Tier 1/2/3" names the three parts inside one concept plugin and is
 never used for these roles.
 
 ## The two plugins, together
 
-Neither plugin here is more foundational than the other — install both.
-**guidance-conventions** enforces the structure your marketplace repo
-should have; **guidance-activation-check** is the runtime helper any
-plugin built with that structure can call on to fail predictably instead
-of confusingly.
+Neither plugin here is more foundational than the other. A marketplace
+author installs both; a consuming workspace needs
+**guidance-activation-check**. **guidance-conventions** enforces the
+structure your marketplace repo should have; **guidance-activation-check**
+is the runtime helper any plugin built with that structure can call on to
+fail predictably instead of confusingly.
 
 - **[guidance-conventions](./plugins/guidance-conventions)** — checks
   your marketplace repo's naming, required docs, and structure as you
@@ -66,13 +74,33 @@ of confusingly.
 
 ## Install
 
-Run these from inside your marketplace project:
+**Marketplace authors** (published or realization marketplace): run these
+from inside your marketplace project:
 
 ```
 /plugin marketplace add DeepElement/claude-plugin-guidance-framework
 /plugin install guidance-conventions@claude-plugin-guidance
 /plugin install guidance-activation-check@claude-plugin-guidance
 ```
+
+**Consuming workspaces**: register the guidance marketplace and install
+the activation check, from inside the workspace:
+
+```
+/plugin marketplace add DeepElement/claude-plugin-guidance-framework
+/plugin install guidance-activation-check@claude-plugin-guidance
+```
+
+Registration is by the marketplace's own `name`, `claude-plugin-guidance`.
+Registering and installing select no realization. To have a teammate who
+clones the workspace get the guidance marketplace too, install at project
+scope as
+[what the consuming workspace must do](./docs/architecture.md#what-the-consuming-workspace-must-do)
+describes. The architecture also covers
+[register, enable, select](./docs/architecture.md#register-enable-select)
+and [where a workspace-authored realization lives](./docs/architecture.md#where-a-workspace-authored-realization-lives).
+A workspace that authors realizations of its own can add
+`guidance-conventions` to validate them.
 
 ## The concept/realization pattern
 
@@ -92,7 +120,8 @@ concepts, [§9 of that document](./docs/architecture.md#9-chains-of-published-ma
 covers how to declare the dependency and what a consuming workspace must
 register. To offer realizations for a concept that another published
 marketplace defines, see
-[§10](./docs/architecture.md#10-realization-marketplaces).
+[§10](./docs/architecture.md#10-realization-marketplaces), which also
+says what a consuming workspace registers to use one.
 
 ## The base standard
 
