@@ -35,11 +35,11 @@ calling skill believes it is (its own registered name, from its
      realization than the one being invoked. Report both values and
      which file/skill to check.
    - If the configured realization doesn't correspond to any installed
-     realization (marketplace-shipped or workspace-authored) — for
-     example, after a marketplace update renamed or removed it — halt
-     and report this as a **stale configuration**, naming the missing
-     realization and pointing at `marketplace-plugin-settings.yml` as the
-     file to fix.
+     realization (shipped by the defining marketplace or
+     workspace-authored) — for example, after an update to the defining
+     marketplace renamed or removed it — halt and report this as a
+     **stale configuration**, naming the missing realization and pointing
+     at `marketplace-plugin-settings.yml` as the file to fix.
 
 4. **Validate the config block.** Read the matched realization's
    `skills/realize-<provider>/schema.json` (a JSON Schema document, per
